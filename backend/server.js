@@ -80,11 +80,22 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
-app.use(express.static(frontendDist));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(frontendDist, 'index.html'));
-});
+const candidateDistDirs = [
+  process.env.FRONTEND_DIST,
+  path.join(__dirname, 'public'),
+  path.join(__dirname, '..', 'frontend', 'dist'),
+];
+const frontendDist = candidateDistDirs.find(d => d && fs.existsSync(path.join(d, 'index.html')));
+
+if (frontendDist) {
+  logger.info(`Serving frontend from ${frontendDist}`);
+  app.use(express.static(frontendDist));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+} else {
+  logger.warn('Frontend build (index.html) not found. Serving API only.');
+}
 
 cron.schedule('0 7 * * 1-5', async () => {
   logger.info('[CRON] Sync Classroom mulai...');

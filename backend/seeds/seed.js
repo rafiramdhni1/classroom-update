@@ -1,48 +1,92 @@
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-
-const KELAS_LIST = ['X-TKJ1', 'X-TKJ2', 'XI-TKJ1', 'XI-TKJ2', 'XII-TKJ1', 'XII-TKJ2'];
-const ANGKATAN_MAP = { X: 2024, XI: 2023, XII: 2022 };
+const fs = require('fs');
+const path = require('path');
 
 async function seed() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
-    console.log('Connected to MongoDB');
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/smk_akademik';
+    await mongoose.connect(mongoUri);
+    console.log('Connected to MongoDB:', mongoUri);
 
     const db = mongoose.connection.db;
     await db.collection('users').deleteMany({});
     await db.collection('students').deleteMany({});
-    console.log('Cleared existing data');
+    console.log('Cleared existing users & students data');
 
-    console.log('Hashing password...');
-    const defaultHash = await bcrypt.hash('240001', 10);
+    console.log('Hashing default password (123456)...');
+    const defaultHash = await bcrypt.hash('123456', 10);
+    const adminHash = await bcrypt.hash('admin123', 12);
 
-    let nisCounter = 240001;
+    const dataPath = path.join(__dirname, 'students-data.json');
+    const studentsRaw = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+
     const studentsBatch = [];
     const usersBatch = [];
 
-    for (const kelas of KELAS_LIST) {
-      const angkatanKey = kelas.split('-')[0];
-      const angkatan = ANGKATAN_MAP[angkatanKey];
+    // Admin account
+    const adminStudentId = new mongoose.Types.ObjectId();
+    studentsBatch.push({
+      _id: adminStudentId,
+      nis: 'ADMIN001',
+      nisn: 'ADMIN001',
+      nama: 'Administrator',
+      kelas: 'X-TKJ1',
+      angkatan: 2026,
+      orangTuaNama: '-',
+      orangTuaTelepon: '-',
+      isActive: true,
+    });
+    usersBatch.push({
+      nis: 'ADMIN001',
+      nisn: 'admin',
+      password: adminHash,
+      role: 'admin',
+      studentId: adminStudentId,
+      mustChangePassword: false,
+    });
 
-      for (let i = 1; i <= 36; i++) {
-        const nis = String(nisCounter++);
-        const nisn = `00${nis}`;
-        const studentId = new mongoose.Types.ObjectId();
+    // Real students from photos
+    for (const s of studentsRaw) {
+      const studentId = new mongoose.Types.ObjectId();
+      const nis = String(s.nis).trim();
+      const nisn = String(s.nisn).trim();
+      const nama = s.nama.trim();
+      const kelas = s.kelas.trim();
+      const angkatan = Number(s.angkatan);
 
-        studentsBatch.push({
-          _id: studentId, nis, nisn,
-          nama: `Siswa ${kelas}-${String(i).padStart(2, '0')}`,
-          kelas, angkatan,
-          orangTuaNama: `Orang Tua ${nis}`,
-          orangTuaTelepon: `6281${String(Math.floor(Math.random() * 100000000)).padStart(8, '0')}`,
-          isActive: true,
-        });
+      studentsBatch.push({
+        _id: studentId,
+        nis,
+        nisn,
+        nama,
+        kelas,
+        angkatan,
+        orangTuaNama: `Orang Tua ${nama}`,
+        orangTuaTelepon: '-',
+        isActive: true,
+      });
 
-        usersBatch.push({ nis, nisn, password: defaultHash, mustChangePassword: true, role: 'student', studentId });
-        usersBatch.push({ nis: `${nis}-OT`, nisn: `${nisn}-OT`, password: defaultHash, mustChangePassword: true, role: 'parent', studentId });
-      }
+      // Student User
+      usersBatch.push({
+        nis,
+        nisn,
+        password: defaultHash,
+        mustChangePassword: true,
+        role: 'student',
+        studentId,
+      });
+
+      // Parent User
+      usersBatch.push({
+        nis: `${nis}-OT`,
+        nisn: `${nisn}-OT`,
+        password: defaultHash,
+        mustChangePassword: true,
+        role: 'parent',
+        studentId,
+      });
     }
 
     const S = 50;
@@ -58,9 +102,18 @@ async function seed() {
     }
     console.log('');
 
-    console.log(`\n✅ ${studentsBatch.length} siswa, ${usersBatch.length} user`);
-    console.log('Login siswa:  NISN=00240001, Password=240001');
-    console.log('Login ortu:   NISN=00240001-OT, Password=240001');
+    console.log(`\n✅ Selesai! ${studentsBatch.length - 1} siswa (+1 admin), ${usersBatch.length} akun user.`);
+    console.log('--------------------------------------------------');
+    console.log('📌 Kredensial Login Siswa:');
+    console.log('   Username / NIS : 14707 (contoh siswa X-TKJ1)');
+    console.log('   Password       : 123456');
+    console.log('📌 Kredensial Login Orang Tua:');
+    console.log('   Username / NIS : 14707-OT');
+    console.log('   Password       : 123456');
+    console.log('📌 Kredensial Login Admin:');
+    console.log('   Username       : admin');
+    console.log('   Password       : admin123');
+    console.log('--------------------------------------------------');
 
     process.exit(0);
   } catch (error) {

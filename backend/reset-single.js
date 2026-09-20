@@ -21,5 +21,5 @@ async function resetStudent(nisn) {
   process.exit(0);
 }
 
-const nisn = process.argv[2] || '00240001';
+const nisn = process.argv[2] || '14707';
 resetStudent(nisn);

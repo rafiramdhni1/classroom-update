@@ -166,7 +166,7 @@ export default function AdminPanel() {
 
       const { data } = await api.post('/admin/students/bulk-create', {
         students,
-        defaultPassword: 'smk123',
+        defaultPassword: '123456',
       });
       setBulkResult(data);
       setExportedCodes(data.codes || []);
@@ -325,31 +325,10 @@ export default function AdminPanel() {
 
   const addAssignment = async () => {
     if (!newAssignment.title.trim()) return;
-    setGradeLoading(true);
-    try {
-      await api.post('/grades/assignment', {
-        subject: gradeSubject,
-        title: newAssignment.title.trim(),
-        type: newAssignment.type,
-      });
-      setShowNewAssignment(false);
-      setNewAssignment({ title: '', type: 'tugas' });
-      await loadGrades();
-    } catch (err) {
-      alert('Gagal menambah tugas: ' + (err.response?.data?.error || err.message));
-    } finally {
-      setGradeLoading(false);
-    }
-  };
-
-  const removeAssignment = async (title) => {
-    if (!confirm(`Hapus tugas "${title}" beserta nilainya?`)) return;
-    try {
-      await api.delete(`/grades?subject=${gradeSubject}&title=${encodeURIComponent(title)}`);
-      await loadGrades();
-    } catch (err) {
-      alert('Gagal menghapus tugas: ' + (err.response?.data?.error || err.message));
-    }
+    setGradeAssignments(prev => [...prev, newAssignment.title.trim()]);
+    setAssignmentTypes(prev => ({ ...prev, [newAssignment.title.trim()]: newAssignment.type }));
+    setShowNewAssignment(false);
+    setNewAssignment({ title: '', type: 'tugas' });
   };
 
   const updateScore = (studentIdx, assignment, score) => {
@@ -504,65 +483,71 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-gradient-to-r from-gray-800 to-gray-900 text-white p-4">
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-gray-50 pb-16">
+      <header className="bg-gradient-to-r from-gray-800 to-gray-900 text-white sticky top-0 z-30 shadow-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold">Panel Admin</h1>
-            <p className="text-gray-300 text-sm">SMK TKJ - Sistem Akademik</p>
+            <h1 className="text-base sm:text-lg font-bold">Panel Admin</h1>
+            <p className="text-gray-300 text-xs sm:text-sm">SMK TKJ - Sistem Informasi Akademik</p>
           </div>
-          <button onClick={logout} className="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg text-sm">Logout</button>
-        </div>
-      </div>
-
-      {stats && (
-        <div className="p-4 grid grid-cols-2 gap-3">
-          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
-            <div className="text-2xl font-bold text-primary-600">{stats.totalStudents}</div>
-            <div className="text-xs text-gray-500">Total Siswa</div>
-          </div>
-          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
-            <div className="text-2xl font-bold text-green-600">{stats.activatedChats}</div>
-            <div className="text-xs text-gray-500">Teraktivasi</div>
-          </div>
-          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
-            <div className="text-2xl font-bold text-yellow-600">{stats.pendingCodes}</div>
-            <div className="text-xs text-gray-500">Kode Pending</div>
-          </div>
-          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
-            <div className="text-2xl font-bold text-gray-800">{stats.totalUsers}</div>
-            <div className="text-xs text-gray-500">Total Users</div>
-          </div>
-        </div>
-      )}
-
-      <div className="px-4 flex gap-2 overflow-x-auto pb-2 mt-2">
-        {[
-          { key: 'students', label: 'Siswa' },
-          { key: 'grades', label: 'Input Nilai' },
-          { key: 'classroom', label: 'Nilai Classroom' },
-          { key: 'messages', label: 'Pesan' },
-          { key: 'codes', label: 'Kode Aktivasi' },
-          { key: 'import', label: 'Import' },
-          { key: 'google', label: 'Google Classroom' },
-          { key: 'backup', label: 'Backup' },
-          { key: 'monitoring', label: 'Monitoring' },
-        ].map(t => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition ${
-              tab === t.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'
-            }`}
+            onClick={logout}
+            className="bg-white/15 hover:bg-red-500/80 active:scale-95 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition"
           >
-            {t.label}
+            Logout
           </button>
-        ))}
-      </div>
+        </div>
+      </header>
 
-      <div className="p-4">
-        {/* Students Tab */}
-        {tab === 'students' && (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 space-y-4">
+        {stats && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-white rounded-xl p-3.5 sm:p-4 shadow-sm border border-gray-100 text-center">
+              <div className="text-2xl sm:text-3xl font-extrabold text-primary-600">{stats.totalStudents}</div>
+              <div className="text-xs text-gray-500 mt-1">Total Siswa</div>
+            </div>
+            <div className="bg-white rounded-xl p-3.5 sm:p-4 shadow-sm border border-gray-100 text-center">
+              <div className="text-2xl sm:text-3xl font-extrabold text-green-600">{stats.activatedChats}</div>
+              <div className="text-xs text-gray-500 mt-1">Teraktivasi</div>
+            </div>
+            <div className="bg-white rounded-xl p-3.5 sm:p-4 shadow-sm border border-gray-100 text-center">
+              <div className="text-2xl sm:text-3xl font-extrabold text-yellow-600">{stats.pendingCodes}</div>
+              <div className="text-xs text-gray-500 mt-1">Kode Pending</div>
+            </div>
+            <div className="bg-white rounded-xl p-3.5 sm:p-4 shadow-sm border border-gray-100 text-center">
+              <div className="text-2xl sm:text-3xl font-extrabold text-gray-800">{stats.totalUsers}</div>
+              <div className="text-xs text-gray-500 mt-1">Total Users</div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+          {[
+            { key: 'students', label: 'Siswa' },
+            { key: 'grades', label: 'Input Nilai' },
+            { key: 'classroom', label: 'Nilai Classroom' },
+            { key: 'messages', label: 'Pesan' },
+            { key: 'codes', label: 'Kode Aktivasi' },
+            { key: 'import', label: 'Import' },
+            { key: 'google', label: 'Google Classroom' },
+            { key: 'backup', label: 'Backup' },
+            { key: 'monitoring', label: 'Monitoring' },
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition shadow-xs ${
+                tab === t.key ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div>
+          {/* Students Tab */}
+          {tab === 'students' && (
           <div>
             <div className="flex gap-2 mb-3">
               <input
@@ -717,16 +702,7 @@ export default function AdminPanel() {
 
                   <div className="flex flex-wrap gap-1">
                     {gradeAssignments.map((a, i) => (
-                      <span key={i} className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full">
-                          {a}
-                          <button
-                            onClick={() => removeAssignment(a)}
-                            title={`Hapus tugas ${a}`}
-                            className="text-gray-400 hover:text-red-600 px-0.5"
-                          >
-                            ×
-                          </button>
-                        </span>
+                      <span key={i} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full">{a}</span>
                     ))}
                     {gradeAssignments.length === 0 && (
                       <p className="text-xs text-gray-400">Belum ada komponen. Klik "+ Tambah" untuk menambahkan.</p>
@@ -755,9 +731,7 @@ export default function AdminPanel() {
                           {gradeData.map((sg, si) => {
                             const scores = gradeAssignments.map(a => {
                               const g = sg.grades.find(gr => gr.title === a);
-                              return g && g.score !== '' && g.score !== undefined && g.score !== null
-                                ? Number(g.score)
-                                : null;
+                              return g && g.score !== '' && g.score !== undefined ? Number(g.score) : null;
                             }).filter(s => s !== null);
                             const avg = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : '-';
                             return (
@@ -1102,7 +1076,7 @@ export default function AdminPanel() {
               <textarea
                 value={bulkText}
                 onChange={(e) => setBulkText(e.target.value)}
-                placeholder={"240101, 00240101, Ahmad Fauzi, X-TKJ1\n240102, 00240102, Budi Santoso, X-TKJ1"}
+                placeholder={"14707, 14707, Ahmad Reiza Fahmi, X-TKJ1\n14708, 14708, Aldhitya Ahmad Fahri, X-TKJ1"}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono h-40 resize-none focus:ring-2 focus:ring-primary-500 outline-none"
               />
               <button
@@ -1116,7 +1090,7 @@ export default function AdminPanel() {
                   {bulkResult.message}
                 </div>
               )}
-              <p className="text-xs text-gray-400">Password default: smk123</p>
+              <p className="text-xs text-gray-400">Password default: 123456</p>
             </div>
 
             <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
@@ -1410,10 +1384,11 @@ export default function AdminPanel() {
           </div>
         )}
       </div>
+    </div>
 
       {editingStudent && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm space-y-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-3">
             <h3 className="font-semibold text-gray-800">Edit Siswa</h3>
             <input
               type="text"

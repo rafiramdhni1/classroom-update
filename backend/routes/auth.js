@@ -25,20 +25,20 @@ const generateToken = (userId) => {
 // POST /api/auth/login
 router.post('/login', validate(loginSchema), async (req, res) => {
   try {
-    const { nis, password } = req.body;
+    const { nisn, password } = req.body;
 
-    if (!nis || !password) {
-      return res.status(400).json({ error: 'Nomor Induk dan password harus diisi.' });
+    if (!nisn || !password) {
+      return res.status(400).json({ error: 'NIS / Username dan password harus diisi.' });
     }
 
-    const user = await User.findOne({ nis });
+    const user = await User.findOne({ $or: [{ nisn }, { nis: nisn }] });
     if (!user) {
-      return res.status(401).json({ error: 'Nomor Induk atau password salah.' });
+      return res.status(401).json({ error: 'NIS atau password salah.' });
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(401).json({ error: 'NISN atau password salah.' });
+      return res.status(401).json({ error: 'NIS atau password salah.' });
     }
 
     user.lastLogin = new Date();
@@ -51,7 +51,6 @@ router.post('/login', validate(loginSchema), async (req, res) => {
         token,
         user: {
           id: user._id,
-          nis: user.nis,
           nisn: user.nisn,
           role: user.role,
           mustChangePassword: user.mustChangePassword,
@@ -65,7 +64,6 @@ router.post('/login', validate(loginSchema), async (req, res) => {
       token,
       user: {
         id: user._id,
-        nis: user.nis,
         nisn: user.nisn,
         role: user.role,
         mustChangePassword: user.mustChangePassword,
@@ -107,11 +105,11 @@ router.post('/change-password', auth, validate(changePasswordSchema), async (req
 // POST /api/auth/forgot-password - kirim OTP ke Telegram
 router.post('/forgot-password', validate(forgotPasswordSchema), async (req, res) => {
   try {
-    const { nis } = req.body;
+    const { nisn } = req.body;
 
-    const user = await User.findOne({ nis });
+    const user = await User.findOne({ nisn });
     if (!user) {
-      return res.status(404).json({ error: 'Nomor Induk tidak ditemukan.' });
+      return res.status(404).json({ error: 'NISN tidak ditemukan.' });
     }
 
     const otp = crypto.randomInt(100000, 999999).toString();
@@ -157,11 +155,11 @@ router.post('/forgot-password', validate(forgotPasswordSchema), async (req, res)
 // POST /api/auth/verify-otp
 router.post('/verify-otp', validate(verifyOtpSchema), async (req, res) => {
   try {
-    const { nis, otp, newPassword } = req.body;
+    const { nisn, otp, newPassword } = req.body;
 
-    const user = await User.findOne({ nis });
+    const user = await User.findOne({ nisn });
     if (!user) {
-      return res.status(404).json({ error: 'Nomor Induk tidak ditemukan.' });
+      return res.status(404).json({ error: 'NISN tidak ditemukan.' });
     }
 
     if (user.resetPasswordOtp !== otp) {
@@ -187,11 +185,11 @@ router.post('/verify-otp', validate(verifyOtpSchema), async (req, res) => {
 // POST /api/auth/fallback-verify - verifikasi NISN + faktor tambahan
 router.post('/fallback-verify', validate(fallbackVerifySchema), async (req, res) => {
   try {
-    const { nis, orangTuaNama } = req.body;
+    const { nisn, orangTuaNama } = req.body;
 
-    const student = await Student.findOne({ nis });
+    const student = await Student.findOne({ nisn });
     if (!student) {
-      return res.status(404).json({ error: 'Nomor Induk tidak ditemukan.' });
+      return res.status(404).json({ error: 'NISN tidak ditemukan.' });
     }
 
     if (student.orangTuaNama?.toLowerCase().trim() !== orangTuaNama.toLowerCase().trim()) {
@@ -226,7 +224,6 @@ router.get('/me', auth, async (req, res) => {
     res.json({
       user: {
         id: req.user._id,
-        nis: req.user.nis,
         nisn: req.user.nisn,
         role: req.user.role,
         mustChangePassword: req.user.mustChangePassword,

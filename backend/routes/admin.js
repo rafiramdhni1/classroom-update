@@ -266,7 +266,7 @@ router.post('/students/bulk-create', adminOnly, validate(bulkCreateSchema), asyn
     const { students, defaultPassword } = req.body;
 
     const results = [];
-    const angkatanMap = { X: 10, XI: 11, XII: 12 };
+    const angkatanMap = { X: 2026, XI: 2025, XII: 2024 };
 
     for (const s of students) {
       const existing = await Student.findOne({ nisn: s.nisn });
@@ -282,13 +282,13 @@ router.post('/students/bulk-create', adminOnly, validate(bulkCreateSchema), asyn
         nisn: s.nisn,
         nama: s.nama,
         kelas: s.kelas,
-        angkatan: angkatanMap[angkatanMatch?.[1]] || s.angkatan || 2024,
+        angkatan: angkatanMap[angkatanMatch?.[1]] || s.angkatan || 2026,
         orangTuaNama: s.orangTuaNama,
         orangTuaTelepon: s.orangTuaTelepon,
       });
       await student.save();
 
-      const plainPassword = defaultPassword || s.nisn;
+      const plainPassword = defaultPassword || '123456';
 
       const user = new User({
         nis: s.nis || s.nisn,
