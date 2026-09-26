@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Panduan Proses Pembuatan Project - SMK TKJ Akademik</title>
+<link rel="stylesheet" href="github.min.css" />
+<style>
+  :root {
+    --primary: #4f46e5;
+    --primary-dark: #3730a3;
+    --sidebar-bg: #0f172a;
+    --sidebar-text: #cbd5e1;
+    --sidebar-hover: #334155;
+    --border: #e5e7eb;
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --code-bg: #f1f5f9;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+
+  /* ==== TOP BAR ==== */
+  .topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 60px;
+    background: var(--sidebar-bg);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 20px;
+    z-index: 50;
+    box-shadow: 0 2px 8px rgba(0,0,0,.2);
+  }
+  .topbar .menu-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 22px;
+    cursor: pointer;
+    display: none;
+  }
+  .topbar .logo {
+    font-weight: 700;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .topbar .logo .badge {
+    background: var(--primary);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 99px;
+    letter-spacing: .5px;
+  }
+  .topbar .search {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 8px;
+    padding: 6px 12px;
+    width: 260px;
+    max-width: 40vw;
+  }
+  .topbar .search input {
+    background: none;
+    border: none;
+    outline: none;
+    color: #fff;
+    width: 100%;
+    font-size: 14px;
+  }
+  .topbar .search input::placeholder { color: #94a3b8; }
+
+  /* ==== SIDEBAR ==== */
+  .sidebar {
+    position: fixed;
+    top: 60px; bottom: 0; left: 0;
+    width: 280px;
+    background: var(--sidebar-bg);
+    color: var(--sidebar-text);
+    overflow-y: auto;
+    z-index: 40;
+    padding: 18px 0 40px;
+    transition: transform .25s ease;
+  }
+  .sidebar::-webkit-scrollbar { width: 6px; }
+  .sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 6px; }
+  .sidebar h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #64748b;
+    padding: 0 20px 10px;
+    font-weight: 700;
+  }
+  .sidebar ul { list-style: none; }
+  .sidebar ul li a {
+    display: block;
+    padding: 8px 20px 8px 24px;
+    color: var(--sidebar-text);
+    text-decoration: none;
+    font-size: 13.5px;
+    border-left: 3px solid transparent;
+    transition: all .15s;
+  }
+  .sidebar ul li a:hover {
+    background: var(--sidebar-hover);
+    color: #fff;
+  }
+  .sidebar ul li a.active {
+    background: rgba(79,70,229,.2);
+    color: #fff;
+    border-left-color: var(--primary);
+  }
+  .sidebar .sidebar-sub a { font-size: 12.5px; padding-left: 40px; }
+  .sidebar-sub { display: none; }
+  .sidebar-section.open .sidebar-sub { display: block; }
+
+  /* ==== MAIN ==== */
+  .main {
+    margin-left: 280px;
+    margin-top: 60px;
+    padding: 40px 48px 80px;
+    min-height: calc(100vh - 60px);
+  }
+
+  .content {
+    max-width: 860px;
+    margin: 0 auto;
+    background: var(--surface);
+    padding: 48px 56px;
+    border-radius: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+
+  /* ==== TYPOGRAPHY (rendered markdown) ==== */
+  .content h1 {
+    font-size: 30px;
+    font-weight: 800;
+    color: var(--primary-dark);
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 14px;
+    margin: 0 0 28px;
+    line-height: 1.3;
+  }
+  .content h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--primary-dark);
+    margin: 40px 0 16px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    scroll-margin-top: 80px;
+  }
+  .content h3 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 28px 0 12px;
+    scroll-margin-top: 80px;
+  }
+  .content h4 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin: 20px 0 8px;
+    scroll-margin-top: 80px;
+  }
+  .content p { margin: 12px 0; }
+  .content ul, .content ol { margin: 12px 0 12px 26px; }
+  .content li { margin: 6px 0; }
+  .content a { color: var(--primary); text-decoration: none; }
+  .content a:hover { text-decoration: underline; }
+
+  .content blockquote {
+    border-left: 4px solid var(--primary);
+    background: #eef2ff;
+    padding: 12px 18px;
+    margin: 16px 0;
+    border-radius: 0 8px 8px 0;
+    color: #3730a3;
+  }
+  .content blockquote p { margin: 4px 0; }
+
+  .content code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 13px;
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 5px;
+    color: #be185d;
+  }
+  .content pre {
+    background: #0f172a;
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin: 16px 0;
+    overflow-x: auto;
+    position: relative;
+  }
+  .content pre code {
+    background: none;
+    color: #e2e8f0;
+    padding: 0;
+    font-size: 13.5px;
+    line-height: 1.6;
+    display: block;
+  }
+
+  .content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06);
+  }
+  .content table th {
+    background: #eef2ff;
+    color: var(--primary-dark);
+    font-weight: 600;
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 2px solid var(--border);
+  }
+  .content table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .content table tr:hover td { background: #f8fafc; }
+  .content table tr:last-child td { border-bottom: none; }
+
+  .content hr { border: none; border-top: 1px solid var(--border); margin: 30px 0; }
+
+  .content strong { font-weight: 700; }
+
+  /* ==== SEARCH HIGHLIGHT ==== */
+  mark { background: #fef08a; padding: 0 2px; border-radius: 3px; }
+
+  /* ==== PROGRESS BAR ==== */
+  .progress {
+    position: fixed;
+    top: 60px; left: 0;
+    height: 3px;
+    background: var(--primary);
+    width: 0%;
+    z-index: 60;
+    transition: width .1s;
+  }
+
+  /* ==== RESPONSIVE ==== */
+  @media (max-width: 768px) {
+    .topbar .menu-btn { display: block; }
+    .topbar .search { width: 140px; }
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); box-shadow: 0 0 30px rgba(0,0,0,.4); }
+    .main { margin-left: 0; padding: 20px 12px 60px; }
+    .content { padding: 24px 20px; }
+    .content h1 { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div class="progress" id="progress"></div>
+
+<!-- Top bar -->
+<header class="topbar">
+  <button class="menu-btn" id="menuBtn" aria-label="Buka menu">&#9776;</button>
+  <div class="logo">
+    <span>&#128204;</span> Panduan Proses Pembuatan
+    <span class="badge">SMK TKJ</span>
+  </div>
+  <div class="search">
+    <input type="text" id="searchInput" placeholder="Cari bagian dokumentasi..." />
+  </div>
+</header>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <div id="sidebarContent">
+    <h3>Buka menu</h3>
+    <ul id="loadPlaceholder"><li><a style="color:#64748b">&hellip; memuat daftar isi &hellip;</a></li></ul>
+  </div>
+</aside>
+
+<!-- Main content -->
+<main class="main">
+  <article class="content" id="content">
+    <div class="loading" style="padding:60px 0;text-align:center;color:#64748b">Memuat dokumentasi...</div>
+  </article>
+</main>
+
+<script src="marked.min.js"></script>
+<script src="highlight.min.js"></script>
+<script>
+// ====== Konfigurasi marked ======
+marked.setOptions({
+  gfm: true,
+  breaks: false,
+});
+const markdownFile = "../PROSES-PEMBUATAN.md";
+
+// ====== Elemen yang dipakai ======
+const contentEl = document.getElementById('content');
+const sidebarEl = document.getElementById('sidebar');
+const sidebarContent = document.getElementById('sidebarContent');
+const progressEl = document.getElementById('progress');
+const searchInput = document.getElementById('searchInput');
+const menuBtn = document.getElementById('menuBtn');
+
+// ====== State ======
+let tocData = [];   // [{id, text, level, children}]
+
+// ====== Ambil markdown lalu render ======
+async function loadDoc() {
+  try {
+    const res = await fetch(markdownFile);
+    if (!res.ok) throw new Error('File markdown tidak ditemukan');
+    const md = await res.text();
+    render(md);
+  } catch (err) {
+    contentEl.innerHTML =
+      '<h2>Gagal memuat dokumentasi</h2>' +
+      '<p style="color:#dc2626">' + err.message + '</p>' +
+      '<p>Pastikan file <code>PROSES-PEMBUATAN.md</code> ada di folder yang sama dengan project ini (folder di atas <code>docs-ui/</code>).</p>';
+  }
+}
+
+// ====== Render markdown ke HTML ======
+function render(md) {
+  const rawHtml = marked.parse(md);
+  contentEl.innerHTML = rawHtml;
+  highlightCode();
+  buildTOC();
+  searchActive = null;
+}
+
+function highlightCode() {
+  document.querySelectorAll('.content pre code').forEach((block) => {
+    try { hljs.highlightElement(block); }
+    catch (e) { /* biarkan apa adanya */ }
+  });
+}
+
+// Sanitasi id agar unik & aman
+function slugify(text, index) {
+  const base = text.toLowerCase()
+    .replace(/&/g, '-')
+    .replace(/[^a-z0-9\u00e0-\u00ff]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return (base || 'section') + '-' + index;
+}
+
+// ====== Bangun Daftar Isi dari heading ======
+function buildTOC() {
+  const headings = contentEl.querySelectorAll('h1, h2, h3');
+  tocData = [];
+  let count = { h1: 0, h2: 0, h3: 0 };
+
+  headings.forEach((h, i) => {
+    const tag = h.tagName.toLowerCase();
+    if (h.id) count[tag] = 0;               // reset kalau ada penanda
+    h.id = h.id || slugify(h.textContent, i);
+    tocData.push({ id: h.id, text: h.textContent.trim(), tag });
+  });
+
+  // Grouping: h1 -> section, h2 -> sub-item
+  const html = [];
+  let currentSec = null;
+  for (const item of tocData) {
+    if (item.id === 'daftar-isi-1' || item.id.includes('daftar-isi')) continue;
+    if (item.tag === 'h1') {
+      if (currentSec) html.push('</ul></li>');
+      currentSec = item;
+      html.push('<li class="sidebar-section"><a href="#' + item.id + '">' + item.text + '</a><ul class="sidebar-sub">');
+    } else if (item.tag === 'h2') {
+      html.push('<li><a href="#' + item.id + '">' + item.text + '</a></li>');
+    } else if (item.tag === 'h3') {
+      html.push('<li><a href="#' + item.id + '" style="padding-left:40px;font-size:12.5px">' + item.text + '</a></li>');
+    }
+  }
+  if (currentSec) html.push('</ul></li>');
+
+  sidebarContent.innerHTML =
+    '<h3>Daftar Isi</h3><ul>' + html.join('') + '</ul>';
+
+  // Aktifkan section pertama
+  const firstSec = sidebarContent.querySelector('.sidebar-section');
+  if (firstSec) firstSec.classList.add('open');
+  navigateToHash();
+}
+
+// ====== Pencarian (filter item sidebar) ======
+let searchActive = null;
+searchInput.addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  const links = sidebarContent.querySelectorAll('a');
+  links.forEach(a => {
+    const txt = a.textContent.toLowerCase();
+    a.style.display = txt.includes(q) ? '' : 'none';
+  });
+
+  // highlight teks di dalam konten
+  if (searchActive) {
+    searchActive.remove();
+    searchActive = null;
+  }
+  if (!q) { contentEl.querySelectorAll('mark').forEach(m => m.replaceWith(m.textContent)); return; }
+
+  const tree = document.createTreeWalker(contentEl, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (tree.nextNode()) {
+    const n = tree.currentNode;
+    if (n.parentElement && n.parentElement.closest('pre')) continue; // jangan di kode
+    if (n.textContent.toLowerCase().includes(q)) nodes.push(n);
+  }
+  suroundMarkup(nodes, q);
+});
+
+function suroundMarkup(nodes, q) {
+  nodes.forEach(n => {
+    const frag = document.createDocumentFragment();
+    const lower = n.textContent.toLowerCase();
+    let last = 0;
+    for (let idx = lower.indexOf(q); idx !== -1; idx = lower.indexOf(q, idx + q.length)) {
+      frag.appendChild(document.createTextNode(n.textContent.slice(last, idx)));
+      const mk = document.createElement('mark');
+      mk.textContent = n.textContent.slice(idx, idx + q.length);
+      frag.appendChild(mk);
+      last = idx + q.length;
+    }
+    frag.appendChild(document.createTextNode(n.textContent.slice(last)));
+    n.replaceWith(frag);
+  });
+  searchActive = contentEl;
+}
+
+// ====== Scroll spy: tandai item sidebar aktif ======
+const tocLinks = () => Array.from(sidebarContent.querySelectorAll('a'));
+let currentActive = null;
+
+function scrollSpy() {
+  const pos = window.scrollY + 90;
+  let active = null;
+  for (const item of tocData) {
+    const el = document.getElementById(item.id);
+    if (el && el.offsetTop + el.offsetHeight >= pos) { active = item; break; }
+  }
+  if (!active && tocData.length) active = tocData[0];
+
+  tocLinks().forEach(a => {
+    const isActive = active ? a.getAttribute('href') === '#' + active.id : false;
+    a.classList.toggle('active', isActive);
+    // buka section yang berisi item aktif
+    const sec = a.closest('.sidebar-section');
+    if (isActive && sec && !sec.classList.contains('open')) sec.classList.add('open');
+  });
+}
+
+// ====== Progress bar ======
+function updateProgress() {
+  const h = document.documentElement.scrollHeight - window.innerHeight;
+  const pct = h > 0 ? (window.scrollY / h) * 100 : 0;
+  progressEl.style.width = pct + '%';
+}
+
+// ====== Sidebar mobile toggle ======
+menuBtn.addEventListener('click', () => sidebarEl.classList.toggle('open'));
+document.addEventListener('click', (e) => {
+  if (window.innerWidth <= 768 && !sidebarEl.contains(e.target) && e.target !== menuBtn) {
+    sidebarEl.classList.remove('open');
+  }
+});
+
+// Anchor click -> tutup sidebar di mobile
+sidebarContent.addEventListener('click', (e) => {
+  if (e.target.tagName === 'A' && window.innerWidth <= 768) sidebarEl.classList.remove('open');
+});
+
+// ====== Navigate ke hash (jika ada) ======
+function navigateToHash() {
+  if (window.location.hash) {
+    const el = document.querySelector(window.location.hash);
+    if (el) { el.scrollIntoView(); return; }
+  }
+  tocData.forEach(i => { const el = document.getElementById(i.id); if (el) el.style.scrollMarginTop = '76px'; });
+}
+
+// ====== Event scroll & load ======
+window.addEventListener('scroll', () => { updateProgress(); scrollSpy(); });
+window.addEventListener('resize', updateProgress);
+window.addEventListener('hashchange', () => navigateToHash());
+
+// ====== Mulai ======
+loadDoc();
+updateProgress();
+</script>
+</body>
+</html>

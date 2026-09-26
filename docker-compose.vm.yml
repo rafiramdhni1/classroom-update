@@ -1,0 +1,25 @@
+# Override khusus Amazon Linux VM (HTTP port 8080, tanpa SSL).
+# Dipakai bersama compose utama:
+#   docker compose -f docker-compose.yml -f docker-compose.vm.yml up -d --build
+#
+# ─────────────────────────────────────────────────────────────────────────
+# CATATAN port/volume nginx:
+#  - ports:  "8080:80"  -> akses lewat http://<IP_VM>:8080
+#  - volumes: ./nginx/vm-conf:/etc/nginx/conf.d (menggantikan ./nginx/conf.d
+#    yang isinya masih config lama frontend:80/backend:5000).
+#    Target mount SAMA (/etc/nginx/conf.d) => definisi di file ini yang menang.
+#  - mount ./nginx/ssl -> sengaja TIDAK dipakai (jalur HTTP). Kalau nanti mau
+#    HTTPS/domain, gunakan docker-compose.yml utama (ferbaiki proxy di
+#    nginx/conf.d dulu) + inisialisasi sertifikat certbot manual.
+# ─────────────────────────────────────────────────────────────────────────
+services:
+  app:
+    environment:
+      # Biar cron sync (07:00) & notifikasi harian (17:00) ikut WIB, bukan UTC.
+      TZ: Asia/Jakarta
+
+  nginx:
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/vm-conf:/etc/nginx/conf.d:ro

@@ -1,0 +1,32 @@
+# Override untuk VM dengan domain + HTTPS (Let's Encrypt).
+# Dipakai bersama compose utama:
+#   docker compose -f docker-compose.yml -f docker-compose.ssl.yml up -d --build
+#
+# CATATAN:
+#  - nginx/conf.d yang bawaan repo TIDAK dipakai. File di dalamnya masih
+#    menunjuk ke service `frontend:80` / `backend:5000` yang sudah tidak ada
+#    (compose sekarang hanya punya service `app` yang menyatukan frontend+API).
+#  - Folder yang dipakai: ./nginx/ssl-conf (HTTP + HTTPS dalam 1 folder).
+#    ssl.conf di-disable dulu (ssl.conf.disabled) supaya nginx tetap start
+#    sebelum sertifikat terbit; diaktifkan otomatis oleh migrate-to-vm.sh.
+services:
+  app:
+    environment:
+      TZ: Asia/Jakarta
+
+  nginx:
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/ssl-conf:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/letsencrypt:ro
+      - certbot_data:/var/www/certbot
+
+  certbot:
+    volumes:
+      - certbot_data:/var/www/certbot
+      - ./nginx/ssl:/etc/letsencrypt
+
+volumes:
+  certbot_data:
