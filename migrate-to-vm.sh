@@ -48,6 +48,31 @@ need_vm()  { [ -n "$VM_HOST" ] || die "VM_HOST belum diisi. Contoh: VM_HOST=1.2.
 ssh_vm() { ssh -p "$VM_SSH_PORT" -o BatchMode=yes -o ConnectTimeout=15 "$VM_USER@$VM_HOST" "$@"; }
 scp_vm() { scp -P "$VM_SSH_PORT" -o BatchMode=yes -o ConnectTimeout=15 "$@"; }
 
+# sudo non-interaktif: 'sudo' saja akan menggantung kalau VM minta password.
+sudo_vm() { ssh_vm "sudo -n $*"; }
+
+preflight_vm() {
+  step "0/5 Preflight koneksi SSH ke $VM_USER@$VM_HOST:$VM_SSH_PORT"
+  ssh_vm "true" 2>/dev/null || die "Tidak bisa SSH ke $VM_USER@$VM_HOST:$VM_SSH_PORT.
+  Cek: (1) IP benar, (2) port SSH terbuka, (3) public key sudah di ~/.ssh/authorized_keys VM.
+  Public key mesin ini: $(cat "$HOME/.ssh/id_ed25519_vm.pub" 2>/dev/null || echo '<belum ada>')"
+  ssh_vm "sudo -n true" 2>/dev/null || die "sudo di VM minta password, tapi eksekusi ini non-interaktif.
+  Perbaiki salah satu:
+    a) Beri passwordless sudo di VM:
+         echo '$VM_USER ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/99-$VM_USER-nopasswd
+    b) Jalankan manual: ssh -t $VM_USER@$VM_HOST 'sudo mkdir -p $VM_APP_DIR && sudo chown $USER $VM_APP_DIR' lalu panggil ulang"
+  local os
+  os="$(ssh_vm "(. /etc/os-release 2>/dev/null && echo \$PRETTY_NAME) || cat /etc/system-release 2>/dev/null || echo unknown" | tr -d '\r')"
+  ok "VM hidup: $os"
+  ssh_vm "nproc | tr -d '\n' | sed 's/^/   CPU: /'; free -m | awk '/Mem:/{printf \"   RAM: %d MB\n\", \$2}'; df -h / | awk 'NR==2{printf \"   Disk: %s (sisa %s)\n\", \$2, \$4}'" | sed 's/^/  /'
+  local ram
+  ram="$(ssh_vm "free -m | awk '/Mem:/{print \$2}'")"
+  if [ "${ram:-0}" -lt 1800 ]; then
+    warn "RAM ${ram} MB < 2000 MB. Build frontend (Vite) berisiko OOM. Tambah swap dulu:"
+    warn "  sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile"
+  fi
+}
+
 compose_cmd() {
   if [ "$VM_MODE" = "https" ]; then
     echo "docker compose -f docker-compose.yml -f docker-compose.ssl.yml"
@@ -65,6 +90,8 @@ cmd_prepare() {
   need_cmd git mongodump mongosh rsync scp ssh
   need_vm
   [ "$VM_MODE" = "https" ] && [ -z "$VM_DOMAIN" ] && die "VM_MODE=https butuh VM_DOMAIN (domain yang aim ke IP VM)."
+
+  preflight_vm
 
   step "1/5 Cek isi git di $SOURCE_DIR"
   local dirty
@@ -109,7 +136,8 @@ cmd_prepare() {
   ok "Source terkirim ke $VM_USER@$VM_HOST:$STAGE_DIR"
 
   step "4/5 Pindahkan ke $VM_APP_DIR + kirim dump database"
-  ssh_vm "sudo mkdir -p '$VM_APP_DIR' && sudo cp -a '$STAGE_DIR/.' '$VM_APP_DIR/' && sudo chown -R '$VM_USER:$VM_USER' '$VM_APP_DIR' && rm -rf '$STAGE_DIR'"
+  sudo_vm "mkdir -p '$VM_APP_DIR' && cp -a '$STAGE_DIR/.' '$VM_APP_DIR/' && chown -R '$VM_USER:$VM_USER' '$VM_APP_DIR'" >/dev/null
+  ssh_vm "rm -rf '$STAGE_DIR'"
   scp_vm "$dump" "$VM_USER@$VM_HOST:/tmp/"
   ssh_vm "mkdir -p '$VM_APP_DIR/migration-backup' && mv '/tmp/$(basename "$dump")' '$VM_APP_DIR/migration-backup/'"
   ok "Project di $VM_APP_DIR, dump di $VM_APP_DIR/migration-backup/"
