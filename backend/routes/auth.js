@@ -25,13 +25,14 @@ const generateToken = (userId) => {
 // POST /api/auth/login
 router.post('/login', validate(loginSchema), async (req, res) => {
   try {
-    const { nisn, password } = req.body;
+    const { nis, nisn, password } = req.body;
+    const loginId = nis || nisn;
 
-    if (!nisn || !password) {
+    if (!loginId || !password) {
       return res.status(400).json({ error: 'NIS / Username dan password harus diisi.' });
     }
 
-    const user = await User.findOne({ $or: [{ nisn }, { nis: nisn }] });
+    const user = await User.findOne({ $or: [{ nisn: loginId }, { nis: loginId }] });
     if (!user) {
       return res.status(401).json({ error: 'NIS atau password salah.' });
     }
@@ -46,7 +47,7 @@ router.post('/login', validate(loginSchema), async (req, res) => {
 
     const token = generateToken(user._id);
 
-    if (user.role === 'admin') {
+    if (user.role === 'admin' || user.role === 'guru') {
       return res.json({
         token,
         user: {
@@ -228,6 +229,7 @@ router.get('/me', auth, async (req, res) => {
         role: req.user.role,
         mustChangePassword: req.user.mustChangePassword,
         hasGoogleAuth: !!req.user.googleAccessToken,
+        googleEmail: req.user.googleEmail || null,
       },
       student: student ? {
         id: student._id,
@@ -282,6 +284,17 @@ router.get('/google/callback', async (req, res) => {
     user.googleAccessToken = tokens.access_token;
     user.googleRefreshToken = tokens.refresh_token;
     user.googleTokenExpiry = new Date(tokens.expiry_date);
+    try {
+      const emailRes = await fetch('https://oauth2.googleapis.com/userinfo', {
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      });
+      if (emailRes.ok) {
+        const info = await emailRes.json();
+        if (info.email) user.googleEmail = info.email;
+      }
+    } catch (err) {
+      console.error('Gagal ambil email Google:', err.message);
+    }
     await user.save();
 
     // Redirect ke frontend dengan status sukses

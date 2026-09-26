@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../utils/api';
+import toast from '../components/Toaster';
 
 export default function AdminPanel() {
   const { user, logout } = useAuth();
-  const [tab, setTab] = useState('students');
+  const isAdmin = user?.role === 'admin';
+  const [tab, setTab] = useState(isAdmin ? 'students' : 'google');
   const [stats, setStats] = useState(null);
   const [students, setStudents] = useState([]);
   const [codes, setCodes] = useState([]);
@@ -24,8 +26,14 @@ export default function AdminPanel() {
   const [bulkResult, setBulkResult] = useState(null);
   const [exportedCodes, setExportedCodes] = useState([]);
   const [googleAuth, setGoogleAuth] = useState(null);
+  const [googleEmail, setGoogleEmail] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
+
+  const [teachers, setTeachers] = useState([]);
+  const [teachersLoading, setTeachersLoading] = useState(false);
+  const [teacherForm, setTeacherForm] = useState({ nama: '', nisn: '', password: '' });
+  const [teacherMsg, setTeacherMsg] = useState('');
 
   const [editingStudent, setEditingStudent] = useState(null);
   const [editForm, setEditForm] = useState({ nis: '', nisn: '', nama: '', kelas: '', orangTuaNama: '', orangTuaTelepon: '' });
@@ -73,6 +81,7 @@ export default function AdminPanel() {
     if (tab === 'backup') loadBackups();
     if (tab === 'monitoring') loadMonitoring();
     if (tab === 'classroom') loadClassroomSubjects();
+    if (tab === 'teachers') loadTeachers();
   }, [tab]);
   useEffect(() => { loadStudents(); }, [page, filterKelas, search]);
 
@@ -87,16 +96,21 @@ export default function AdminPanel() {
 
   const loadData = async () => {
     try {
-      const [statsRes, codesRes, msgsRes, meRes] = await Promise.all([
-        api.get('/admin/dashboard-stats'),
-        api.get('/admin/activation-codes'),
-        api.get('/admin/messages'),
-        api.get('/auth/me'),
-      ]);
-      setStats(statsRes.data);
-      setCodes(codesRes.data.codes);
-      setMessages(msgsRes.data.messages);
+      const meRes = await api.get('/auth/me');
       setGoogleAuth(meRes.data.user?.hasGoogleAuth || false);
+      setGoogleEmail(meRes.data.user?.googleEmail || null);
+
+      const statsRes = await api.get('/admin/dashboard-stats');
+      setStats(statsRes.data);
+
+      if (isAdmin) {
+        const [codesRes, msgsRes] = await Promise.all([
+          api.get('/admin/activation-codes'),
+          api.get('/admin/messages'),
+        ]);
+        setCodes(codesRes.data.codes);
+        setMessages(msgsRes.data.messages);
+      }
     } catch (err) {
       console.error('Gagal memuat data:', err);
     } finally {
@@ -369,9 +383,9 @@ export default function AdminPanel() {
         }
       }
       const { data } = await api.post('/grades/bulk', { grades: gradesToSave });
-      alert(data.message);
+      toast.success(data.message);
     } catch (err) {
-      alert('Gagal menyimpan: ' + (err.response?.data?.error || err.message));
+      toast.error('Gagal menyimpan: ' + (err.response?.data?.error || err.message));
     } finally {
       setGradeSaving(false);
     }
@@ -391,9 +405,21 @@ export default function AdminPanel() {
     setSyncResult(null);
     try {
       const { data } = await api.post('/auth/google/sync');
-      setSyncResult({ success: true, message: data.message, courses: data.data?.coursesFound || 0 });
+      const courses = data.data?.coursesFound || 0;
+      const skipped = data.data?.skipped || 0;
+      toast.success(
+        `Sinkronisasi Google Classroom berhasil!\n${courses} kelas ditemukan${skipped ? `, ${skipped} dilewati (siswa tidak terdaftar)` : ''}`
+      );
+      setSyncResult({
+        success: true,
+        message: data.message,
+        courses,
+        skipped,
+      });
     } catch (err) {
-      setSyncResult({ success: false, message: err.response?.data?.error || 'Gagal sinkronisasi' });
+      const msg = err.response?.data?.error || 'Gagal sinkronisasi';
+      toast.error('Sinkronisasi gagal: ' + msg);
+      setSyncResult({ success: false, message: msg });
     } finally {
       setSyncing(false);
     }
@@ -413,10 +439,12 @@ export default function AdminPanel() {
     setSyncingStudents(true);
     setSyncStudentsResult(null);
     try {
-      const { data } = await api.post('/classroom-realtime/sync-students');
+      const data = await (await api.post('/classroom-realtime/sync-students')).data;
       setSyncStudentsResult(data);
+      toast.success('Sinkronisasi ID siswa selesai');
     } catch (err) {
-      alert('Gagal sync siswa: ' + (err.response?.data?.error || err.message));
+      const msg = err.response?.data?.error || err.message;
+      toast.error('Gagal sync siswa: ' + msg);
     } finally {
       setSyncingStudents(false);
     }
@@ -424,18 +452,52 @@ export default function AdminPanel() {
 
   const loadClassroomSubjects = async () => {
     try {
-      const { data } = await api.get('/classroom-grades/subjects');
-      setClassroomSubjects(data.subjects);
+      const MIN_MATCHED_STUDENTS = 10;
+      const { data } = await api.get('/classroom-realtime/courses');
+      const raw = (data.courses || [])
+        .filter(c => c.alias && (isAdmin || Number(c.matchedStudents) >= MIN_MATCHED_STUDENTS))
+        .map(c => ({
+          _id: c.id,
+          courseName: c.name,
+          alias: c.alias,
+          kelas: Array.isArray(c.kelas) ? c.kelas : [],
+          matchedStudents: Number(c.matchedStudents) || 0,
+        }));
+      let courses = raw;
+      if (!isAdmin) {
+        // Untuk guru: maksimal satu kursus tiap (mapel + kelas).
+        // Bila duplikat, simpankan yang paling banyak siswa cocok dengan data admin.
+        const seen = new Map();
+        courses = [];
+        for (const s of raw) {
+          const key = `${s.alias}|${s.kelas[0] || ''}`;
+          const prev = seen.get(key);
+          if (!prev) {
+            seen.set(key, s);
+            courses.push(s);
+          } else if (s.matchedStudents > prev.matchedStudents) {
+            courses[courses.indexOf(prev)] = s;
+            seen.set(key, s);
+          }
+        }
+      }
+      courses.sort((a, b) => {
+          if (a.alias !== b.alias) return a.alias.localeCompare(b.alias);
+          const aLabel = a.kelas[0] || a.courseName;
+          const bLabel = b.kelas[0] || b.courseName;
+          return aLabel.localeCompare(bLabel);
+        });
+      setClassroomSubjects(courses);
     } catch (err) {
       console.error('Gagal memuat mata pelajaran:', err);
     }
   };
 
-  const loadClassroomGrades = async () => {
+  const loadClassroomGrades = async (useCache = true) => {
     if (!classroomKelas || !classroomSubject) return;
     setClassroomLoading(true);
     try {
-      const res = await api.get(`/classroom-realtime/grades?kelas=${classroomKelas}&subject=${classroomSubject}`);
+      const res = await api.get(`/classroom-realtime/grades?kelas=${classroomKelas}&courseId=${classroomSubject}&cached=${useCache ? '1' : '0'}`);
       const data = res.data.data || [];
       const students = res.data.students || [];
       
@@ -473,6 +535,41 @@ export default function AdminPanel() {
   useEffect(() => {
     if (classroomKelas && classroomSubject) loadClassroomGrades();
   }, [classroomKelas, classroomSubject]);
+
+  const loadTeachers = async () => {
+    setTeachersLoading(true);
+    try {
+      const { data } = await api.get('/admin/teachers');
+      setTeachers(data.teachers);
+    } catch (err) {
+      console.error('Gagal memuat guru:', err);
+    } finally {
+      setTeachersLoading(false);
+    }
+  };
+
+  const createTeacher = async (e) => {
+    e.preventDefault();
+    setTeacherMsg('');
+    try {
+      const { data } = await api.post('/admin/teachers', teacherForm);
+      setTeacherMsg({ ok: true, text: `Akun guru berhasil dibuat. NISN: ${data.teacher.nisn} • Password: ${data.teacher.passwordDefault}` });
+      setTeacherForm({ nama: '', nisn: '', password: '' });
+      loadTeachers();
+    } catch (err) {
+      setTeacherMsg({ ok: false, text: err.response?.data?.error || 'Gagal membuat akun guru.' });
+    }
+  };
+
+  const deleteTeacher = async (id) => {
+    if (!confirm('Hapus akun guru ini? Data sync milik guru akan ikut dihapus.')) return;
+    try {
+      await api.delete(`/admin/teachers/${id}`);
+      loadTeachers();
+    } catch (err) {
+      alert('Gagal menghapus: ' + (err.response?.data?.error || err.message));
+    }
+  };
 
   if (loading) {
     return (
@@ -523,16 +620,17 @@ export default function AdminPanel() {
 
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
           {[
-            { key: 'students', label: 'Siswa' },
-            { key: 'grades', label: 'Input Nilai' },
-            { key: 'classroom', label: 'Nilai Classroom' },
-            { key: 'messages', label: 'Pesan' },
-            { key: 'codes', label: 'Kode Aktivasi' },
-            { key: 'import', label: 'Import' },
-            { key: 'google', label: 'Google Classroom' },
-            { key: 'backup', label: 'Backup' },
-            { key: 'monitoring', label: 'Monitoring' },
-          ].map(t => (
+            { key: 'students', label: 'Siswa', adminOnly: true },
+            { key: 'grades', label: 'Input Nilai', adminOnly: true },
+            { key: 'classroom', label: 'Nilai Classroom', adminOnly: false },
+            { key: 'messages', label: 'Pesan', adminOnly: true },
+            { key: 'codes', label: 'Kode Aktivasi', adminOnly: true },
+            { key: 'import', label: 'Import', adminOnly: true },
+            { key: 'google', label: 'Google Classroom', adminOnly: false },
+            { key: 'teachers', label: 'Guru', adminOnly: true },
+            { key: 'backup', label: 'Backup', adminOnly: true },
+            { key: 'monitoring', label: 'Monitoring', adminOnly: true },
+          ].filter(t => isAdmin || ['students', 'grades', 'classroom', 'google'].includes(t.key)).map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
@@ -805,12 +903,23 @@ export default function AdminPanel() {
                 </select>
                 <select
                   value={classroomSubject}
-                  onChange={(e) => setClassroomSubject(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setClassroomSubject(val);
+                    const chosen = classroomSubjects.find(s => s._id === val);
+                    if (chosen && chosen.kelas?.length === 1) setClassroomKelas(chosen.kelas[0]);
+                  }}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 >
-                  <option value="">Pilih Mata Pelajaran</option>
-                  {classroomSubjects.map(s => (
-                    <option key={s._id} value={s._id}>{s._id} - {s.courseName}</option>
+                  <option value="">Pilih Kelas Google Classroom</option>
+                  {[...new Set(classroomSubjects.map(s => s.alias))].sort().map(alias => (
+                    <optgroup key={alias} label={alias}>
+                      {classroomSubjects.filter(s => s.alias === alias).map(s => (
+                        <option key={s._id} value={s._id}>
+                          {s.kelas.length > 0 ? s.kelas.join(', ') : s.courseName}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </div>
@@ -826,10 +935,14 @@ export default function AdminPanel() {
                     setClassroomLoading(true);
                     try {
                       await api.post('/auth/google/sync');
-                      alert('Sinkronisasi berhasil!');
-                      loadClassroomGrades();
+                      toast.success('Sinkronisasi Google Classroom berhasil!\nKelas & nilai terbaru sudah dimuat.');
+                      if (classroomKelas && classroomSubject) {
+                        await Promise.all([loadClassroomSubjects(), loadClassroomGrades()]);
+                      } else {
+                        await loadClassroomSubjects();
+                      }
                     } catch (err) {
-                      alert('Gagal sync: ' + (err.response?.data?.error || err.message));
+                      toast.error('Gagal sync: ' + (err.response?.data?.error || err.message));
                     } finally {
                       setClassroomLoading(false);
                     }
@@ -840,7 +953,7 @@ export default function AdminPanel() {
                   {classroomLoading ? 'Syncing...' : 'Sync Google Classroom'}
                 </button>
                 <button
-                  onClick={loadClassroomGrades}
+                  onClick={() => loadClassroomGrades(false)}
                   disabled={classroomLoading || !classroomKelas || !classroomSubject}
                   className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 text-sm disabled:opacity-50"
                 >
@@ -926,7 +1039,7 @@ export default function AdminPanel() {
             )}
 
             {!classroomKelas || !classroomSubject ? (
-              <p className="text-center text-gray-500 text-sm py-8">Pilih kelas dan mata pelajaran untuk melihat nilai dari Google Classroom.</p>
+              <p className="text-center text-gray-500 text-sm py-8">Pilih kelas dan pilih kelas Google Classroom untuk melihat nilai.</p>
             ) : null}
           </div>
         )}
@@ -1146,6 +1259,108 @@ export default function AdminPanel() {
           </div>
         )}
 
+        {/* Guru Tab */}
+        {tab === 'teachers' && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
+              <h3 className="font-semibold text-gray-800">Tambah Akun Guru</h3>
+              <p className="text-xs text-gray-500">
+                Setiap guru login dashboard dengan NISN &amp; password masing-masing, lalu menghubungkan akun Google sendiri.
+              </p>
+              <form onSubmit={createTeacher} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input
+                  type="text"
+                  placeholder="Nama Guru"
+                  value={teacherForm.nama}
+                  onChange={(e) => setTeacherForm({ ...teacherForm, nama: e.target.value })}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                  required
+                />
+                <input
+                  type="text"
+                  placeholder="NISN (username login)"
+                  value={teacherForm.nisn}
+                  onChange={(e) => setTeacherForm({ ...teacherForm, nisn: e.target.value })}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                  required
+                />
+                <input
+                  type="text"
+                  placeholder="Password (default 123456)"
+                  value={teacherForm.password}
+                  onChange={(e) => setTeacherForm({ ...teacherForm, password: e.target.value })}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                />
+                <button
+                  type="submit"
+                  className="bg-primary-600 text-white py-2 rounded-lg font-medium hover:bg-primary-700 text-sm"
+                >
+                  Buat Akun Guru
+                </button>
+              </form>
+              {teacherMsg && (
+                <div className={`px-4 py-3 rounded-lg text-sm ${teacherMsg.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                  {teacherMsg.text}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-gray-800">Daftar Guru</h3>
+                <button
+                  onClick={loadTeachers}
+                  disabled={teachersLoading}
+                  className="text-xs bg-gray-100 text-gray-700 px-3 py-1 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                >
+                  Muat Ulang
+                </button>
+              </div>
+              {teachersLoading ? (
+                <p className="text-center text-gray-500 text-sm py-4">Memuat...</p>
+              ) : teachers.length === 0 ? (
+                <p className="text-center text-gray-500 text-sm py-4">Belum ada akun guru.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Nama</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">NISN</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Google Terhubung</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {teachers.map(t => (
+                        <tr key={t.id} className="border-t border-gray-100">
+                          <td className="px-3 py-2 text-xs font-medium text-gray-800">{t.nama}</td>
+                          <td className="px-3 py-2 text-xs font-mono">{t.nisn}</td>
+                          <td className="px-3 py-2 text-xs">
+                            {t.hasGoogleAuth ? (
+                              <span className="text-green-600">{t.googleEmail || 'Terhubung'}</span>
+                            ) : (
+                              <span className="text-gray-400">Belum</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-xs">
+                            <button
+                              onClick={() => deleteTeacher(t.id)}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              Hapus
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Google Classroom Tab */}
         {tab === 'google' && (
           <div className="bg-white rounded-xl p-4 shadow-sm space-y-4">
@@ -1177,6 +1392,9 @@ export default function AdminPanel() {
                   </svg>
                   <span className="text-sm font-medium">Terhubung dengan Google Classroom</span>
                 </div>
+                <p className="text-xs text-gray-500 -mt-1">
+                  Terhubung sebagai {googleEmail || 'akun Google Anda'}
+                </p>
 
                 <button
                   onClick={syncClassroom}
@@ -1191,7 +1409,7 @@ export default function AdminPanel() {
                     syncResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
                   }`}>
                     {syncResult.success 
-                      ? `Berhasil! ${syncResult.courses} kelas ditemukan.`
+                      ? `Berhasil! ${syncResult.courses} kelas ditemukan${syncResult.skipped ? `, ${syncResult.skipped} dilewati (siswa tidak terdaftar)` : ''}.`
                       : syncResult.message
                     }
                   </div>

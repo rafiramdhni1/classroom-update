@@ -22,6 +22,9 @@ router.get('/', auth, async (req, res) => {
   try {
     const student = await Student.findById(req.user.studentId);
     if (!student) {
+      if (req.user.role === 'admin') {
+        return res.json({ user: { role: 'admin', nisn: req.user.nisn }, student: null, grades: [], messages: [], subjectGrades: [], overallAverage: 0, classRank: { rank: 0, total: 0 }, angkatanRank: { rank: 0, total: 0 } });
+      }
       return res.status(404).json({ error: 'Data siswa tidak ditemukan.' });
     }
 

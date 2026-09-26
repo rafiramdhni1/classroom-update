@@ -25,7 +25,7 @@ const studentSchema = new mongoose.Schema({
   kelas: {
     type: String,
     required: true,
-    enum: ['X-TKJ1', 'X-TKJ2', 'XI-TKJ1', 'XI-TKJ2', 'XII-TKJ1', 'XII-TKJ2'],
+    enum: ['X-TKJ1', 'X-TKJ2', 'XI-TKJ1', 'XI-TKJ2', 'XII-TKJ1', 'XII-TKJ2', 'GURU'],
   },
   angkatan: {
     type: Number,

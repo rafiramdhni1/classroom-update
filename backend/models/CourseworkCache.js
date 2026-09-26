@@ -8,6 +8,13 @@ const gradeComponentSchema = new mongoose.Schema({
 }, { _id: false });
 
 const courseworkSchema = new mongoose.Schema({
+  ownerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true,
+    default: null,
+  },
   classroomCourseId: {
     type: String,
     required: true,
@@ -59,8 +66,9 @@ const courseworkSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-courseworkSchema.index({ classroomCourseId: 1, classroomWorkId: 1 }, { unique: true });
+courseworkSchema.index({ ownerId: 1, classroomCourseId: 1, classroomWorkId: 1 }, { unique: true });
 courseworkSchema.index({ courseAlias: 1 });
 courseworkSchema.index({ dueDate: 1 });
+courseworkSchema.index({ 'studentSubmissions.classroomStudentId': 1 });
 
 module.exports = mongoose.model('CourseworkCache', courseworkSchema);

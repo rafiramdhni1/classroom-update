@@ -1,9 +1,11 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const mongoose = require('mongoose');
 const fetch = require('node-fetch');
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const API = `https://api.telegram.org/bot${TOKEN}`;
+console.log('[Bot] Token loaded:', TOKEN ? TOKEN.substring(0, 10) + '...' : 'UNDEFINED');
+console.log('[Bot] API URL:', API.substring(0, 40) + '...');
 let offset = 0;
 
 const ActivationCode = require('./models/ActivationCode');
@@ -41,8 +43,7 @@ async function handleUpdate(update) {
       `/help - Tampilkan bantuan`
     );
   } else if (text === '/notif') {
-    const chat = await ChatId.findOne({ chatId, isActive: true });
-    if (!chat) {
+    const chat = await ChatId.findOne({ chatId, isActive: true }).sort({ createdAt: -1 });    if (!chat) {
       await sendMessage(chatId,
         '⚠️ Akun belum teraktivasi.\n\nAktivasi dulu dengan kirim Nomor Induk (NIS) kamu.\nContoh: 13667'
       );
@@ -74,7 +75,7 @@ async function handleUpdate(update) {
 
     await sendTelegramMessageWithButton(chatId, text, '📊 Buka Dashboard', dashboardUrl);
   } else if (text === '/status') {
-    const chat = await ChatId.findOne({ chatId, isActive: true });
+    const chat = await ChatId.findOne({ chatId, isActive: true }).sort({ createdAt: -1 });
     if (!chat) {
       await sendMessage(chatId, 'Akun Anda belum teraktivasi. Kirim Nomor Induk (NIS) kamu.');
     } else {
@@ -143,6 +144,9 @@ async function handleUpdate(update) {
       existingChat.activatedAt = new Date();
       await existingChat.save();
     } else {
+      // Deactivate any old chats for this telegram account
+      await ChatId.updateMany({ chatId, isActive: true }, { $set: { isActive: false } });
+
       await new ChatId({
         studentId,
         chatId,

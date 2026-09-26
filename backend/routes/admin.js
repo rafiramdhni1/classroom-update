@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { auth, adminOnly } = require('../middleware/auth');
+const { auth, adminOnly, staffOnly } = require('../middleware/auth');
 const Student = require('../models/Student');
 const AdminMessage = require('../models/AdminMessage');
 const ActivationCode = require('../models/ActivationCode');
@@ -18,7 +18,7 @@ const router = express.Router();
 router.use(auth);
 
 // GET /api/admin/students
-router.get('/students', adminOnly, async (req, res) => {
+router.get('/students', staffOnly, async (req, res) => {
   try {
     const { kelas, angkatan, search, page = 1, limit = 50 } = req.query;
     const filter = { isActive: true };
@@ -46,7 +46,7 @@ router.get('/students', adminOnly, async (req, res) => {
 });
 
 // PUT /api/admin/students/:id
-router.put('/students/:id', adminOnly, async (req, res) => {
+router.put('/students/:id', staffOnly, async (req, res) => {
   try {
     const { nama, kelas, nisn, nis, orangTuaNama, orangTuaTelepon, classroomId } = req.body;
     const updateData = { nama, kelas, nisn, nis, orangTuaNama, orangTuaTelepon };
@@ -76,7 +76,7 @@ router.put('/students/:id', adminOnly, async (req, res) => {
 });
 
 // DELETE /api/admin/students/:id
-router.delete('/students/:id', adminOnly, async (req, res) => {
+router.delete('/students/:id', staffOnly, async (req, res) => {
   try {
     const student = await Student.findByIdAndUpdate(
       req.params.id,
@@ -363,7 +363,7 @@ router.post('/students/bulk-create', adminOnly, validate(bulkCreateSchema), asyn
 });
 
 // GET /api/admin/dashboard-stats
-router.get('/dashboard-stats', adminOnly, async (req, res) => {
+router.get('/dashboard-stats', staffOnly, async (req, res) => {
   try {
     const totalStudents = await Student.countDocuments({ isActive: true });
     const totalUsers = await User.countDocuments();
@@ -398,5 +398,106 @@ function cryptoRandom(length) {
   }
   return result;
 }
+
+// GET /api/admin/teachers - Daftar akun guru
+router.get('/teachers', adminOnly, async (req, res) => {
+  try {
+    const users = await User.find({ role: 'guru' }).sort({ createdAt: -1 });
+    const students = await Student.find();
+    const studentMap = {};
+    for (const s of students) studentMap[s._id.toString()] = s;
+
+    const teachers = users.map(u => ({
+      id: u._id,
+      nis: u.nis,
+      nisn: u.nisn,
+      nama: studentMap[u.studentId?.toString()]?.nama || u.nisn,
+      googleEmail: u.googleEmail || null,
+      hasGoogleAuth: !!u.googleAccessToken,
+      lastLogin: u.lastLogin,
+      createdAt: u.createdAt,
+    }));
+
+    res.json({ teachers });
+  } catch (error) {
+    console.error('List teachers error:', error);
+    res.status(500).json({ error: 'Terjadi kesalahan server.' });
+  }
+});
+
+// POST /api/admin/teachers - Buat akun guru
+router.post('/teachers', adminOnly, async (req, res) => {
+  try {
+    const { nama, nisn, password } = req.body;
+    if (!nama || !nisn) {
+      return res.status(400).json({ error: 'Nama dan NISN wajib diisi.' });
+    }
+
+    const cleanNisn = String(nisn).trim();
+    const existing = await User.findOne({ nisn: cleanNisn });
+    if (existing) {
+      return res.status(400).json({ error: 'NISN sudah terdaftar.' });
+    }
+
+    const teacherStudent = new Student({
+      nis: cleanNisn,
+      nisn: cleanNisn,
+      nama,
+      kelas: 'GURU',
+      angkatan: new Date().getFullYear(),
+      isActive: false,
+    });
+    await teacherStudent.save();
+
+    const user = new User({
+      nis: cleanNisn,
+      nisn: cleanNisn,
+      password: password || '123456',
+      role: 'guru',
+      studentId: teacherStudent._id,
+      mustChangePassword: false,
+    });
+    await user.save();
+
+    res.status(201).json({
+      message: 'Akun guru berhasil dibuat.',
+      teacher: {
+        id: user._id,
+        nis: user.nis,
+        nisn: user.nisn,
+        nama,
+        passwordDefault: password || '123456',
+      },
+    });
+  } catch (error) {
+    console.error('Create teacher error:', error);
+    res.status(500).json({ error: 'Terjadi kesalahan server.' });
+  }
+});
+
+// DELETE /api/admin/teachers/:userId - Hapus akun guru
+router.delete('/teachers/:userId', adminOnly, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Akun guru tidak ditemukan.' });
+    }
+    if (user.role !== 'guru') {
+      return res.status(400).json({ error: 'Hanya akun guru yang bisa dihapus.' });
+    }
+
+    const studentId = user.studentId;
+    await User.findByIdAndDelete(user._id);
+    if (studentId) await Student.findByIdAndDelete(studentId);
+
+    // Hapus data sync milik guru tersebut
+    await require('../models/CourseworkCache').deleteMany({ ownerId: user._id });
+
+    res.json({ message: 'Akun guru berhasil dihapus.' });
+  } catch (error) {
+    console.error('Delete teacher error:', error);
+    res.status(500).json({ error: 'Terjadi kesalahan server.' });
+  }
+});
 
 module.exports = router;

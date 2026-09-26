@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['student', 'parent', 'admin'],
+    enum: ['student', 'parent', 'admin', 'guru'],
     required: true,
   },
   studentId: {
@@ -37,6 +37,7 @@ const userSchema = new mongoose.Schema({
   googleAccessToken: String,
   googleRefreshToken: String,
   googleTokenExpiry: Date,
+  googleEmail: String,
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {

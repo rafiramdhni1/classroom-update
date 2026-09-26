@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import AdminPanel from './pages/AdminPanel';
+import { Toaster } from './components/Toaster';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -30,7 +31,7 @@ function AdminRoute({ children }) {
   }
 
   if (!user) return <Navigate to="/login" />;
-  if (user.role !== 'admin') return <Navigate to="/dashboard" />;
+  if (user.role !== 'admin' && user.role !== 'guru') return <Navigate to="/dashboard" />;
   return children;
 }
 
@@ -46,7 +47,7 @@ function StudentRoute({ children }) {
   }
 
   if (!user) return <Navigate to="/login" />;
-  if (user.role === 'admin') return <Navigate to="/admin" />;
+  if (user.role === 'admin' || user.role === 'guru') return <Navigate to="/admin" />;
   return children;
 }
 
@@ -54,6 +55,7 @@ function App() {
   return (
     <AuthProvider>
       <Router>
+        <Toaster />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route

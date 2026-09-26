@@ -1,7 +1,7 @@
 const express = require('express');
 const Grade = require('../models/Grade');
 const Student = require('../models/Student');
-const { auth, adminOnly } = require('../middleware/auth');
+const { auth, staffOnly } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -9,7 +9,7 @@ const SUBJECTS = ['ASJ', 'AIJ', 'TJBL', 'PKDK', 'TJKT'];
 const TYPES = ['tugas', 'quiz', 'uts', 'uas'];
 
 // GET /api/grades - Get grades for a class + subject
-router.get('/', auth, adminOnly, async (req, res) => {
+router.get('/', auth, staffOnly, async (req, res) => {
   try {
     const { kelas, subject } = req.query;
     if (!kelas || !subject) {
@@ -45,7 +45,7 @@ router.get('/', auth, adminOnly, async (req, res) => {
 });
 
 // POST /api/grades/assignment - Create assignment with empty grades for all students
-router.post('/assignment', auth, adminOnly, async (req, res) => {
+router.post('/assignment', auth, staffOnly, async (req, res) => {
   try {
     const { subject, title, type, maxScore } = req.body;
 
@@ -88,7 +88,7 @@ router.post('/assignment', auth, adminOnly, async (req, res) => {
 });
 
 // POST /api/grades - Create or update a single grade
-router.post('/', auth, adminOnly, async (req, res) => {
+router.post('/', auth, staffOnly, async (req, res) => {
   try {
     const { studentId, subject, title, type, score, maxScore, notes } = req.body;
 
@@ -126,7 +126,7 @@ router.post('/', auth, adminOnly, async (req, res) => {
 });
 
 // POST /api/grades/bulk - Bulk save grades (spreadsheet mode)
-router.post('/bulk', auth, adminOnly, async (req, res) => {
+router.post('/bulk', auth, staffOnly, async (req, res) => {
   try {
     const { grades } = req.body;
     if (!Array.isArray(grades) || grades.length === 0) {
@@ -172,7 +172,7 @@ router.post('/bulk', auth, adminOnly, async (req, res) => {
 });
 
 // DELETE /api/grades/:id - Delete a grade
-router.delete('/:id', auth, adminOnly, async (req, res) => {
+router.delete('/:id', auth, staffOnly, async (req, res) => {
   try {
     const grade = await Grade.findByIdAndDelete(req.params.id);
     if (!grade) return res.status(404).json({ error: 'Nilai tidak ditemukan.' });
@@ -183,7 +183,7 @@ router.delete('/:id', auth, adminOnly, async (req, res) => {
 });
 
 // DELETE /api/grades - Delete all grades for a subject + title
-router.delete('/', auth, adminOnly, async (req, res) => {
+router.delete('/', auth, staffOnly, async (req, res) => {
   try {
     const { subject, title } = req.query;
     if (!subject || !title) {

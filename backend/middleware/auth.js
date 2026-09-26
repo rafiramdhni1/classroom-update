@@ -29,4 +29,11 @@ const adminOnly = (req, res, next) => {
   next();
 };
 
-module.exports = { auth, adminOnly };
+const staffOnly = (req, res, next) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'guru') {
+    return res.status(403).json({ error: 'Akses ditolak. Hanya admin/guru.' });
+  }
+  next();
+};
+
+module.exports = { auth, adminOnly, staffOnly };

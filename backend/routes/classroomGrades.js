@@ -1,16 +1,16 @@
 const express = require('express');
-const { auth, adminOnly } = require('../middleware/auth');
+const { auth, staffOnly } = require('../middleware/auth');
 const Student = require('../models/Student');
 const CourseworkCache = require('../models/CourseworkCache');
 
 const router = express.Router();
 
 // GET /api/classroom-grades - Get grades by class and subject
-router.get('/', auth, adminOnly, async (req, res) => {
+router.get('/', auth, staffOnly, async (req, res) => {
   try {
     const { kelas, subject } = req.query;
     
-    let filter = {};
+    let filter = { ownerId: req.userId };
     if (subject) filter.courseAlias = subject;
 
     const coursework = await CourseworkCache.find(filter).sort({ dueDate: -1 });
@@ -98,9 +98,10 @@ router.get('/student/:id', auth, async (req, res) => {
 });
 
 // GET /api/classroom-grades/subjects - Get list of subjects with coursework
-router.get('/subjects', auth, adminOnly, async (req, res) => {
+router.get('/subjects', auth, staffOnly, async (req, res) => {
   try {
     const subjects = await CourseworkCache.aggregate([
+      { $match: { ownerId: req.userId } },
       { $group: { _id: '$courseAlias', count: { $sum: 1 }, courseName: { $first: '$courseName' } } },
       { $sort: { _id: 1 } },
     ]);
