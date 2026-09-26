@@ -11,18 +11,25 @@
 #
 # Semua variabel di bawah bisa dioverride dari luar, contoh:
 #   VM_HOST=1.2.3.4 VM_MODE=https VM_DOMAIN=rapzz.my.id bash migrate-to-vm.sh all
+#   VM_HOST=100.102.76.71 VM_USER=ec2-user VM_MODE=ts bash migrate-to-vm.sh all
+#
+# CATATAN TELEGRAM: project ini TIDAK memakai webhook Telegram.
+#   - Notifikasi (cron 07:00/17:00) dikirim inline dari server.js
+#   - Balasan students dibaca lewat bot-poll.js (long polling getUpdates)
+#   Jadi tidak butuh URL publik. JANGAN menjalankan setWebhook.
 # ============================================
 
 set -euo pipefail
 
 # ─────────────── KONFIGURASI (ubah di sini) ───────────────
-VM_HOST="${VM_HOST:-}"                 # IP publik VM (wajib)
-VM_USER="${VM_USER:-ubuntu}"           # user SSH di VM
+VM_HOST="${VM_HOST:-}"                 # IP VM: private (VPC), Tailscale (100.x), atau public
+VM_USER="${VM_USER:-ubuntu}"           # user SSH di VM (Amazon Linux: ec2-user)
 VM_SSH_PORT="${VM_SSH_PORT:-22}"
 VM_APP_DIR="${VM_APP_DIR:-/opt/classroom-update}"
-VM_MODE="${VM_MODE:-http}"             # http = port 8080 tanpa SSL | https = 80/443 + Let's Encrypt
+VM_MODE="${VM_MODE:-http}"             # http = http://IP:8080 | ts = http://IP:8080 + HTTPS via tailscale serve | https = 80/443 + Let's Encrypt
 VM_DOMAIN="${VM_DOMAIN:-}"             # wajib kalau VM_MODE=https
 VM_HTTP_PORT="${VM_HTTP_PORT:-8080}"
+VM_MONGODB_PORT="${VM_MONGODB_PORT:-27017}"
 
 SOURCE_DIR="${SOURCE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 DB_NAME="${DB_NAME:-smk_akademik}"
@@ -80,7 +87,6 @@ compose_cmd() {
     echo "docker compose -f docker-compose.yml -f docker-compose.vm.yml"
   fi
 }
-
 STAGE_DIR="$HOME/.migrate-stage"
 
 # ============================================
@@ -234,12 +240,51 @@ cmd_deploy() {
 
   if [ "$VM_MODE" = "https" ]; then
     setup_ssl
+  elif [ "$VM_MODE" = "ts" ]; then
+    setup_tailscale_serve
   else
-    warn "Mode HTTP: aplikasi hanya di http://$VM_HOST:$VM_HTTP_PORT (Telegram webhook tidak bisa di mode ini)."
+    warn "Mode HTTP murni: aplikasi di http://$VM_HOST:$VM_HTTP_PORT"
+    warn "Google OAuth AKAN GAGAL (Google tolak redirect URI http non-localhost)."
+    warn "Disarankan VM_MODE=ts (tailscale serve) - tanpa public IP, HTTPS asli."
   fi
 
-  set_telegram_webhook
+  telegram_check
   verify_health
+}
+
+# ============================================
+# Tailscale serve - untuk VM_MODE=ts
+# ============================================
+setup_tailscale_serve() {
+  step "EXTRA Aktifkan HTTPS via Tailscale ( tanpa public IP )"
+  if ! command -v tailscale >/dev/null 2>&1; then
+    die "tailscale CLI tidak ada di VM. Install: curl -fsSL https://tailscale.com/install.sh | sh"
+  fi
+
+  local dns ts_url
+  dns="$(tailscale status --json 2>/dev/null | grep -o '"DNSName":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\.$//')"
+  ts_url="https://$dns"
+  if [ -z "$dns" ]; then
+    warn "Tidak bisa baca DNSName Tailscale. Cek manual: tailscale status"
+    warn "Lalu jalankan: sudo tailscale serve --bg $VM_HTTP_PORT"
+    return 0
+  fi
+
+  sudo tailscale serve --bg "http://localhost:$VM_HTTP_PORT" >/dev/null 2>&1 || \
+    sudo tailscale serve --bg "$VM_HTTP_PORT" >/dev/null 2>&1 || \
+    warn "tailscale serve gagal. Jalankan manual: sudo tailscale serve --bg $VM_HTTP_PORT"
+
+  # FRONTEND_URL + GOOGLE_REDIRECT_URI harus ikut ke URL HTTPS ini.
+  sed -i "s|^FRONTEND_URL=.*|FRONTEND_URL=$ts_url|" backend/.env
+  sed -i "s|^GOOGLE_REDIRECT_URI=.*|GOOGLE_REDIRECT_URI=$ts_url/api/auth/google/callback|" backend/.env
+  ok "HTTPS: $ts_url"
+  ok "FRONTEND_URL & GOOGLE_REDIRECT_URI di .env -> $ts_url"
+  echo ""
+  warn "WAJIB: daftarkan URL ini di Google Cloud Console > OAuth redirect URI:"
+  echo "     $ts_url/api/auth/google/callback"
+  echo ""
+  warn "Tailscale serve hanya bisa diakses dari perangkat yang ada di tailnet."
+  warn "Kalau mau bisa diakses tanpa Tailscale -> butuh Elastic IP + domain (mode https)."
 }
 
 # ============================================
@@ -268,27 +313,29 @@ setup_ssl() {
 }
 
 # ============================================
-# Telegram webhook
+# Telegram - cek, JANGAN set webhook
 # ============================================
-set_telegram_webhook() {
-  step "EXTRA Set Telegram webhook"
-  local token frontend webhook
+telegram_check() {
+  step "EXTRA Cek Telegram"
+  local token info
   token="$(grep -E '^TELEGRAM_BOT_TOKEN=' backend/.env | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d '\r')"
-  frontend="$(grep -E '^FRONTEND_URL=' backend/.env | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d '\r')"
   if [ -z "$token" ]; then
-    warn "TELEGRAM_BOT_TOKEN kosong di .env, webhook dilewati."
+    warn "TELEGRAM_BOT_TOKEN kosong di .env - notifikasi tidak akan terkirim."
     return 0
   fi
-  if [ "$VM_MODE" != "https" ]; then
-    warn "Telegram hanya menerima URL HTTPS. Aktifkan dulu SSL, lalu: bash migrate-to-vm.sh verify --set-webhook"
-    return 0
+  info="$(curl -s --max-time 20 "https://api.telegram.org/bot$token/getWebhookInfo" || true)"
+  local wh
+  wh="$(echo "$info" | grep -o '"url": *"[^"]*"' | head -1 | cut -d'"' -f4 || true)"
+  if [ -n "$wh" ]; then
+    warn "Webhook aktif: $wh"
+    warn "Project ini pakai long polling (bot-poll.js). Matikan webhook:"
+    warn "  curl -X POST \"https://api.telegram.org/bot$TOKEN/deleteWebhook\""
+    warn " Lalu jalankan: cd $VM_APP_DIR && node backend/bot-poll.js  (atau via pm2)"
+  else
+    ok "Webhook kosong (benar - project ini pakai long polling)"
   fi
-  webhook="$frontend/api/webhook/telegram"
-  curl -s "https://api.telegram.org/bot$token/deleteWebhook?drop_pending_updates=true" >/dev/null || true
-  curl -s -X POST "https://api.telegram.org/bot$token/setWebhook" \
-    -H "Content-Type: application/json" \
-    -d "{\"url\":\"$webhook\"}" | sed 's/^/   /'
-  ok "Webhook -> $webhook"
+  echo "   Notifikasi cron 07:00/17:00 jalan inline di server.js -> otomatis aktif."
+  echo "   Balasan student butuh: node backend/bot-poll.js  (belum otomatis di Docker)"
 }
 
 # ============================================
@@ -297,7 +344,15 @@ set_telegram_webhook() {
 verify_health() {
   step "Cek health endpoint"
   local url
-  if [ "$VM_MODE" = "https" ]; then url="https://$VM_DOMAIN/api/health"; else url="http://localhost:$VM_HTTP_PORT/api/health"; fi
+  case "$VM_MODE" in
+    https) url="https://$VM_DOMAIN/api/health" ;;
+    ts)
+      local dns
+      dns="$(grep -E '^FRONTEND_URL=' backend/.env | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d '\r')"
+      url="${dns:-http://localhost:$VM_HTTP_PORT}/api/health"
+      ;;
+    *) url="http://localhost:$VM_HTTP_PORT/api/health" ;;
+  esac
   if curl -sf --max-time 20 "$url" >/dev/null; then ok "Health OK: $url"; else err "Health GAGAL: $url"; return 1; fi
 }
 
@@ -321,7 +376,7 @@ cmd_verify() {
   step "4/4 Log aplikasi (30 baris terakhir)"
   docker logs smk-app --tail=30 2>&1 | sed 's/^/   /'
 
-  if [ "${1:-}" = "--set-webhook" ]; then set_telegram_webhook; fi
+  if [ "${1:-}" = "--telegram" ]; then telegram_check; fi
   verify_health
 }
 
@@ -344,7 +399,7 @@ cmd_rollback() {
 }
 
 usage() {
-  sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 # ============================================
