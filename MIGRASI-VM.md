@@ -7,7 +7,7 @@ Tiga mode yang didukung `migrate-to-vm.sh`:
 | Mode | Compose yang dipakai | Akses | Catatan |
 |------|----------------------|-------|---------|
 | `ts` (**untuk VM tanpa public IP**) | `docker-compose.yml` + `docker-compose.vm.yml` | `https://<vm>.<tailnet>.ts.net` | Pakai `tailscale serve`, sertifikat asli dari Tailscale. Hanya bisa diakses dari perangkat di tailnet |
-| `http` | `docker-compose.yml` + `docker-compose.vm.yml` | `http://IP_VM:8080` | **Google OAuth akan gagal** (Google menolak redirect URI `http://` non-localhost). Telegram tetap jalan |
+| `http` | `docker-compose.yml` + `docker-compose.vm.yml` | `http://IP_VM:8081` | **Google OAuth akan gagal** (Google menolak redirect URI `http://` non-localhost). Telegram tetap jalan |
 | `https` | `docker-compose.yml` + `docker-compose.ssl.yml` | `https://domain` | Butuh public IP + DNS A record + port 80/443 terbuka dari internet |
 
 ### Kebutuhan public IP
@@ -32,18 +32,81 @@ Project ini **tidak** memakai webhook Telegram:
 
 ---
 
+## Hasil migrasi aktual (2026-09-28)
+
+Sudah dieksekusi ke `tgcld-vm-1` (`100.102.76.71`, Amazon Linux 2023, user `ec2-user`).
+URL: **`https://tgcld-vm-1.leopon-city.ts.net`** — hanya reachable dari perangkat dalam tailnet.
+
+| | |
+|---|---|
+| Port HTTP | **8081** (bukan 8080 — sudah dipakai app `myapp` milik pemilik VM) |
+| Docker | v25.0.14 + compose v5.5.1 + buildx v0.37.1 (harus dipasang manual) |
+| Spes | 1 vCPU, 1.9 GB RAM, swap 8 GB, disk 25 GB |
+| Data | users 214 · students 213 · coursework 386 (cocok dengan sumber) |
+
+**Soal IP publik:** VM punya IP `103.210.35.18`, TAPI tidak ada inbound publik sama
+sekali — port 22 pun tertutup dari internet (provider memblokir di edge), semua akses
+lewat Tailscale. Jadi `0.0.0.0:80/443/8081` di compose **tidak** berarti terekspos
+ke internet. Tetap ingat kalau later `INPUT` firewall di-open.
+
+### ⚠️ Bot Telegram hanya boleh jalan di satu tempat
+
+`docker compose up -d` akan ikut menyalakan service `bot-poll`. Kalau proyek ini
+masih dilayani dari VPS lama, **`telegram-bot.service` di sana ikut polling bot yang
+sama** → dua `getUpdates` saling menabrak → balasan siswa rusak di kedua sisi
+(`Conflict: terminated by other getUpdates request`).
+
+Selama cutover web belum dilakukan, `smk-bot-poll` di VM **harus tetap stopped**:
+```bash
+sudo docker compose -f docker-compose.yml -f docker-compose.vm.yml stop bot-poll
+```
+Begitu cutover web selesai (VPS lama dimatikan), nyalakan permanen:
+```bash
+sudo docker compose -f docker-compose.yml -f docker-compose.vm.yml up -d bot-poll
+```
+
+### Bug yang ditemukan & diperbaiki saat migrasi
+
+1. **`sudo_vm()` hanya memberi sudo ke perintah pertama.** `sudo_vm "mkdir -p X && cp -a ..."`
+   dipecah oleh `&&` di shell remote, jadi `cp`/`chown` jalan sebagai user biasa → `Permission denied`.
+   Diperbaiki: kirim lewat stdin ke `sudo -n bash -s`.
+2. **`STAGE_DIR` memakai `$HOME` lokal.** Hardcode `$HOME/.migrate-stage` = `/home/ubuntu/...`,
+   padahal user VM `ec2-user` → tidak boleh bikin direktori di sana. Diganti
+   `/tmp/.migrate-stage-$VM_USER`.
+3. **Build gagal: `compose build requires buildx 0.17.0 or later`.** Compose v5 di VM
+   butuh plugin buildx yang tidak ikut terpasang.
+4. **`bot-poll.js` tidak pernah jalan di Docker.** `CMD` cuma `node server.js`, jadi
+   balasan Telegram tidak akan berfungsi. Ditambahkan service `bot-poll` terpisah
+   (bukan digabung, supaya crash-nya tidak menjatuhkan web server).
+5. **502 Bad Gateway setelah container `app` di-recreate.** nginx me-resolve
+   `app:5000` satu kali saat start lalu menyimpan IP-nya; begitu app di-recreate IP
+   berubah, nginx memegang IP basi. Diperbaiki dengan `resolver 127.0.0.11 valid=10s;`
+   + `proxy_pass $upstream_app;` (proxy_pass wajib pakai variabel supaya resolver berlaku).
+
+### Verifikasi health dari dalam VM akan selalu GAGAL (itu normal)
+
+`tailscale serve` tidak bisa dijangkau dari node-nya sendiri (*hairpin*).
+`migrate-to-vm.sh verify` sudah otomatis fallback ke `http://localhost:8081/api/health`.
+Dari perangkat lain di tailnet harus normal — cek dengan:
+```bash
+curl -s https://tgcld-vm-1.leopon-city.ts.net/api/health
+```
+
+---
+
 ## 0. Yang perlu disiapkan di VM
 
 **Sistem**
 - [ ] Ubuntu 22.04/24.04 atau Amazon Linux 2023, user non-root + `sudo`
-- [ ] Docker Engine + plugin `docker compose` (otomatis dipasang oleh skrip, tapi butuh `curl`)
+- [ ] Docker Engine + plugin `docker compose` **dan `docker buildx`** (compose v5-buildx minimal 0.17.0; compose/buildx tidak ikut terpasang otomatis, harus manual — lihat bagian hasil migrasi)
 - [ ] Spec minimum: 2 vCPU, RAM 2 GB, disk 20 GB. Build frontend (Vite) butuh RAM, 1 GB sering OOM
+  > Terverifikasi jalan di 1 vCPU / 1.9 GB **asal swap sudah ada** (8 GB di VM tujuan). Tanpa swap, build Vite OOM.
 
 **Jaringan** (kalau VM tidak punya public IP, sebagian besar lewati)
 - [ ] Port 22 (SSH) terbuka
 - [ ] Mode `ts`: Tailscale terinstall & login di VM, `tailscale status` OK
 - [ ] Mode `https`: port 80 + 443 terbuka dari internet + DNS A record → IP public
-- [ ] Mode `http`: port 8080 terbuka (hanya reachable lewat Tailscale/VPC)
+- [ ] Mode `http`: port 8081 terbuka (hanya reachable lewat Tailscale/VPC)
 - [ ] Security Group di AWS: **jangan** buka 27017 ke mana pun (compose sudah bind ke `127.0.0.1`)
 
 **Kredensial & Akun**
@@ -128,15 +191,20 @@ docker exec smk-mongodb mongosh --quiet mongodb://localhost/smk_akademik \
 
 ## 6. Opsional: auto-start & monitoring
 
-- [ ] `restart: unless-stopped` sudah ada di compose, jadi container otomatis jalan setelah reboot
-- [ ] `sudo systemctl enable tailscaled` — Tailscale harus auto-start supaya `tailscale serve` aktif setelah reboot
-- [ ] **Backup harian** — crontab root:
+- [x] `restart: unless-stopped` sudah ada di compose, jadi container otomatis jalan setelah reboot
+- [x] `sudo systemctl enable tailscaled` — Tailscale harus auto-start supaya `tailscale serve` aktif setelah reboot
+- [x] **Backup harian** — Amazon Linux 2023 tidak punya `crontab` (paket `cronie` belum terpasang), jadi pakai **systemd timer** supaya tidak perlu menambah paket di VM orang lain:
   ```bash
-  0 2 * * * docker exec smk-mongodb mongodump --archive --gzip > /opt/backup/smk_akademik_$(date +\%F).archive.gz && find /opt/backup -name '*.gz' -mtime +14 -delete
+  # skrip: /usr/local/bin/smk-backup.sh  (mongodump + retensi 14 hari, root:root 755)
+  # unit:  /etc/systemd/system/smk-backup.{service,timer}
+  sudo systemctl enable --now smk-backup.timer
+  systemctl list-timers smk-backup.timer     # cek jadwal
+  sudo systemctl start smk-backup.service    # tes manual
   ```
-- [ ] **Watchdog** (opsional) — cron di VM:
+  > Host VM berjalan di **UTC**, jadi `OnCalendar=*-*-* 01:30:00 UTC` = 08:30 WIB. Dipilih agar tidak bentrok dengan cron internal app (notifikasi 07:00/17:00 dan sync 02:00 — semuanya WIB karena container pakai `TZ=Asia/Jakarta`).
+- [ ] **Watchdog** (opsional) — timer systemd 2 menit:
   ```bash
-  */2 * * * * curl -sf --max-time 20 http://localhost:8080/api/health >/dev/null || (cd /opt/classroom-update && docker compose -f docker-compose.yml -f docker-compose.vm.yml restart app nginx) >> /var/log/app-watchdog.log 2>&1
+  */2 * * * * curl -sf --max-time 20 http://localhost:8081/api/health >/dev/null || (cd /opt/classroom-update && docker compose -f docker-compose.yml -f docker-compose.vm.yml restart app nginx) >> /var/log/app-watchdog.log 2>&1
   ```
   (`.watchdog.sh` yang sekarang spesifik pm2 + systemd nginx, tidak bisa dipakai di VM Docker)
 

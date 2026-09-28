@@ -1,10 +1,11 @@
-# Override khusus Amazon Linux VM (HTTP port 8080, tanpa SSL).
+# Override khusus Amazon Linux VM (HTTP tanpa SSL, default port 8081).
 # Dipakai bersama compose utama:
 #   docker compose -f docker-compose.yml -f docker-compose.vm.yml up -d --build
 #
 # ─────────────────────────────────────────────────────────────────────────
 # CATATAN port/volume nginx:
-#  - ports:  "8080:80"  -> akses lewat http://<IP_VM>:8080
+#  - ports:  "8081:80"  -> akses lewat http://<IP_VM>:8081
+#    (8080 dipakai app lain di VM, jadi digeser ke 8081)
 #  - volumes: ./nginx/vm-conf:/etc/nginx/conf.d (menggantikan ./nginx/conf.d
 #    yang isinya masih config lama frontend:80/backend:5000).
 #    Target mount SAMA (/etc/nginx/conf.d) => definisi di file ini yang menang.
@@ -20,6 +21,6 @@ services:
 
   nginx:
     ports:
-      - "8080:80"
+      - "${VM_HTTP_PORT:-8081}:80"
     volumes:
       - ./nginx/vm-conf:/etc/nginx/conf.d:ro

@@ -26,9 +26,9 @@ VM_HOST="${VM_HOST:-}"                 # IP VM: private (VPC), Tailscale (100.x)
 VM_USER="${VM_USER:-ubuntu}"           # user SSH di VM (Amazon Linux: ec2-user)
 VM_SSH_PORT="${VM_SSH_PORT:-22}"
 VM_APP_DIR="${VM_APP_DIR:-/opt/classroom-update}"
-VM_MODE="${VM_MODE:-http}"             # http = http://IP:8080 | ts = http://IP:8080 + HTTPS via tailscale serve | https = 80/443 + Let's Encrypt
+VM_MODE="${VM_MODE:-http}"             # http = http://IP:$VM_HTTP_PORT | ts = + HTTPS via tailscale serve | https = 80/443 + Let's Encrypt
 VM_DOMAIN="${VM_DOMAIN:-}"             # wajib kalau VM_MODE=https
-VM_HTTP_PORT="${VM_HTTP_PORT:-8080}"
+VM_HTTP_PORT="${VM_HTTP_PORT:-8081}"
 VM_MONGODB_PORT="${VM_MONGODB_PORT:-27017}"
 
 SOURCE_DIR="${SOURCE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
@@ -56,7 +56,12 @@ ssh_vm() { ssh -p "$VM_SSH_PORT" -o BatchMode=yes -o ConnectTimeout=15 "$VM_USER
 scp_vm() { scp -P "$VM_SSH_PORT" -o BatchMode=yes -o ConnectTimeout=15 "$@"; }
 
 # sudo non-interaktif: 'sudo' saja akan menggantung kalau VM minta password.
-sudo_vm() { ssh_vm "sudo -n $*"; }
+# Jalankan SELURUH string sebagai root di VM.
+# PENTING: jangan pakai "sudo -n cmd1 && cmd2" — operator && dipecah oleh shell
+# remote, sehingga hanya cmd1 yang Dapet sudo. cmd2 & seterusnya jadi user biasa
+# dan gagal dengan "Permission denied" (kecuali di /opt yang sudah root-owned).
+# Solusinya: kirim lewat stdin ke `bash -s`, jadi satu proses root utuh.
+sudo_vm() { printf '%s\n' "$*" | ssh_vm "sudo -n bash -s"; }
 
 preflight_vm() {
   step "0/5 Preflight koneksi SSH ke $VM_USER@$VM_HOST:$VM_SSH_PORT"
@@ -87,7 +92,10 @@ compose_cmd() {
     echo "docker compose -f docker-compose.yml -f docker-compose.vm.yml"
   fi
 }
-STAGE_DIR="$HOME/.migrate-stage"
+# PENTING: ini path di MESIN VM (remote), bukan di mesin sumber.
+# Jangan pakai $HOME lokal — user VM bisa berbeda (mis. ec2-user vs ubuntu),
+# dan $HOME lokal tidak ada / tidak bisa ditulis di VM.
+STAGE_DIR="${STAGE_DIR:-/tmp/.migrate-stage-$VM_USER}"
 
 # ============================================
 # prepare - jalan di MESIN LAMA
@@ -262,7 +270,12 @@ setup_tailscale_serve() {
   fi
 
   local dns ts_url
-  dns="$(tailscale status --json 2>/dev/null | grep -o '"DNSName":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\.$//')"
+  # Catatan: output `tailscale status --json` memformat dengan SPASI setelah
+  # titik dua ("DNSName": "..."). Pola grep harus toleran whitespace,
+  # kalau tidak DNSName terbaca kosong dan langkah ini di-skip/diam.
+  dns="$(tailscale status --json 2>/dev/null \
+    | grep -o '"DNSName"[[:space:]]*:[[:space:]]*"[^"]*"' \
+    | head -1 | cut -d'"' -f4 | sed 's/\.$//')"
   ts_url="https://$dns"
   if [ -z "$dns" ]; then
     warn "Tidak bisa baca DNSName Tailscale. Cek manual: tailscale status"
@@ -270,9 +283,17 @@ setup_tailscale_serve() {
     return 0
   fi
 
-  sudo tailscale serve --bg "http://localhost:$VM_HTTP_PORT" >/dev/null 2>&1 || \
-    sudo tailscale serve --bg "$VM_HTTP_PORT" >/dev/null 2>&1 || \
-    warn "tailscale serve gagal. Jalankan manual: sudo tailscale serve --bg $VM_HTTP_PORT"
+  # Jangan arahkan output ke /dev/null: kalau gagal, script jadi mati diam-diam
+  # tanpa pesan apa pun. Simpan log supaya error-nya bisa ditampilkan.
+  local serve_log="/tmp/ts-serve.log"
+  if ! sudo tailscale serve --bg "http://localhost:$VM_HTTP_PORT" >"$serve_log" 2>&1; then
+    if ! sudo tailscale serve --bg "$VM_HTTP_PORT" >"$serve_log" 2>&1; then
+      warn "tailscale serve GAGAL. Output:"
+      sed 's/^/       /' "$serve_log"
+      warn "Jalankan manual: sudo tailscale serve --bg $VM_HTTP_PORT"
+      return 0
+    fi
+  fi
 
   # FRONTEND_URL + GOOGLE_REDIRECT_URI harus ikut ke URL HTTPS ini.
   sed -i "s|^FRONTEND_URL=.*|FRONTEND_URL=$ts_url|" backend/.env
@@ -353,7 +374,22 @@ verify_health() {
       ;;
     *) url="http://localhost:$VM_HTTP_PORT/api/health" ;;
   esac
-  if curl -sf --max-time 20 "$url" >/dev/null; then ok "Health OK: $url"; else err "Health GAGAL: $url"; return 1; fi
+  # PENTING: script ini jalan DI VM itu sendiri. Tailscale serve tidak bisa
+  # dijangkau dari node-nya sendiri (hairpin), jadi curls ke URL .ts.net akan
+  # gagal padahal aplikasinya sehat. Karena itu selalu sediakan fallback lokal.
+  local fallback="http://localhost:$VM_HTTP_PORT/api/health"
+  if curl -sf --max-time 20 "$url" >/dev/null; then
+    ok "Health OK: $url"
+  elif [ "$url" != "$fallback" ] && curl -sf --max-time 20 "$fallback" >/dev/null; then
+    ok "Health OK: $fallback"
+    warn "URL Tailscale ($url) tidak bisa dijangkau DARI DALAM VM (hairpin, normal)."
+    warn "Health dicek lewat localhost. Dari perangkat lain di tailnet harus OK:"
+    warn "  curl -s $url"
+  else
+    err "Health GAGAL: $url"
+    err "Health GAGAL juga di $fallback"
+    return 1
+  fi
 }
 
 cmd_verify() {
