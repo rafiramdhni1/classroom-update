@@ -12,6 +12,10 @@ router.get('/', auth, staffOnly, async (req, res) => {
     
     let filter = { ownerId: req.userId };
     if (subject) filter.courseAlias = subject;
+    // Guru hanya boleh melihat mapel yang diampu (User.subjects).
+    if (req.user?.subjects?.length) {
+      filter.courseAlias = { $in: req.user.subjects };
+    }
 
     const coursework = await CourseworkCache.find(filter).sort({ dueDate: -1 });
     
@@ -67,9 +71,14 @@ router.get('/student/:id', auth, async (req, res) => {
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ error: 'Siswa tidak ditemukan.' });
 
-    const coursework = await CourseworkCache.find({
+    const courseworkFilter = {
       'studentSubmissions.classroomStudentId': student.classroomId,
-    }).sort({ dueDate: -1 });
+    };
+    if (req.user?.subjects?.length) {
+      courseworkFilter.courseAlias = { $in: req.user.subjects };
+    }
+    
+    const coursework = await CourseworkCache.find(courseworkFilter).sort({ dueDate: -1 });
 
     const submissions = coursework.map(cw => {
       const sub = cw.studentSubmissions.find(

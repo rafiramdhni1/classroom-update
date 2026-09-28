@@ -55,8 +55,13 @@ router.get('/', auth, async (req, res) => {
     const subjectGrades = {};
     let totalScore = 0;
     let totalSubjects = 0;
-
-    for (const subject of SUBJECTS) {
+    
+    // Guru hanya boleh melihat mapel yang diampu (User.subjects).
+    // Kalau kosong, tidak ada pembatasan.
+    const taughtSubjects = req.user?.subjects?.length ? req.user.subjects : null;
+    const visibleSubjects = taughtSubjects ? SUBJECTS.filter(s => taughtSubjects.includes(s)) : SUBJECTS;
+    
+    for (const subject of visibleSubjects) {
       const subjectWorks = relevantCoursework.filter(w => w.courseAlias === subject);
       const subjectManual = manualGrades.filter(g => g.subject === subject);
       let subjectTotal = 0;

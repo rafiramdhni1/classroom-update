@@ -22,6 +22,12 @@ const userSchema = new mongoose.Schema({
     enum: ['student', 'parent', 'admin', 'guru'],
     required: true,
   },
+  // Mapel yang diampu guru (pakai courseAlias Google Classroom).
+  // Kosong = tidak ada pembatasan, guru melihat semua mapel.
+  subjects: {
+    type: [String],
+    default: [],
+  },
   studentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Student',
