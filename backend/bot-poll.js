@@ -36,11 +36,14 @@ async function handleUpdate(update) {
     );
   } else if (text === '/help') {
     await sendMessage(chatId,
-      `Bantuan:\n` +
-      `/start - Mulai aktivasi\n` +
-      `/status - Cek status akun\n` +
-      `/notif - Kirim contoh notifikasi\n` +
-      `/help - Tampilkan bantuan`
+      `📖 <b>Bantuan Sistem Akademik SMK TKJ:</b>\n\n` +
+      `• /start - Mulai aktivasi\n` +
+      `• /status - Cek status akun\n` +
+      `• /notif - Kirim contoh notifikasi\n` +
+      `• /help - Tampilkan bantuan\n\n` +
+      `📞 <b>Kontak Admin Sekolah:</b>\n` +
+      `• Admin 1: +62 882-3318-2147 (https://wa.me/6288233182147)\n` +
+      `• Admin 2: +62 856-4140-8175 (https://wa.me/6285641408175)`
     );
   } else if (text === '/notif') {
     const chat = await ChatId.findOne({ chatId, isActive: true }).sort({ createdAt: -1 });    if (!chat) {
@@ -137,7 +140,9 @@ async function handleUpdate(update) {
         await sendMessage(chatId,
           '❌ <b>NISN Sudah Digunakan</b>\n\n' +
           'NISN ini sudah teraktivasi oleh akun Telegram lain.\n' +
-          'Jika ini adalah akun kamu, silakan hubungi admin.'
+          'Jika ini adalah akun kamu, silakan hubungi admin sekolah via WhatsApp:\n' +
+          '📱 Admin 1: +62 882-3318-2147 (https://wa.me/6288233182147)\n' +
+          '📱 Admin 2: +62 856-4140-8175 (https://wa.me/6285641408175)'
         );
         return;
       }

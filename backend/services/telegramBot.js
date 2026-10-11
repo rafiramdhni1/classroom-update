@@ -37,7 +37,9 @@ async function handleTelegramWebhook(update) {
       `• /status - Cek status akun\n` +
       `• /notif - Kirim contoh notifikasi\n` +
       `• /help - Tampilkan bantuan ini\n\n` +
-      `Untuk pertanyaan lain, silakan hubungi admin sekolah.`
+      `📞 <b>Kontak Admin Sekolah:</b>\n` +
+      `• Admin 1: +62 882-3318-2147 (https://wa.me/6288233182147)\n` +
+      `• Admin 2: +62 856-4140-8175 (https://wa.me/6285641408175)`
     );
     return;
   }
@@ -145,7 +147,9 @@ async function handleTelegramWebhook(update) {
         await sendTelegramMessage(chatId,
           '❌ <b>Nomor Induk Sudah Digunakan</b>\n\n' +
           'Nomor Induk ini sudah teraktivasi oleh akun Telegram lain.\n' +
-          'Jika ini adalah akun kamu, silakan hubungi admin.'
+          'Jika ini adalah akun kamu, silakan hubungi admin sekolah via WhatsApp:\n' +
+          '📱 Admin 1: +62 882-3318-2147 (https://wa.me/6288233182147)\n' +
+          '📱 Admin 2: +62 856-4140-8175 (https://wa.me/6285641408175)'
         );
         return;
       }

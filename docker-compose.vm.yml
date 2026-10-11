@@ -20,7 +20,16 @@ services:
       TZ: Asia/Jakarta
 
   nginx:
-    ports:
+    # !override (bukan sekadar "ports:") karena Compose MENAMBAHKAN daftar
+    # ports dari file utama. Tanpa !override, "80:80" & "443:443" dari
+    # docker-compose.yml tetap ikut dan container gagal start:
+    #   listen tcp4 0.0.0.0:443: bind: address already in use
+    # (443 dipegang tailscaled untuk Tailscale Serve, yang proxy ke
+    #  http://localhost:8081 di bawah).
+    # 443 sengaja dihilangkan: path VM ini HTTP-only, folder nginx/ssl
+    # tidak berisi sertifikat.
+    ports: !override
+      - "80:80"
       - "${VM_HTTP_PORT:-8081}:80"
     volumes:
       - ./nginx/vm-conf:/etc/nginx/conf.d:ro

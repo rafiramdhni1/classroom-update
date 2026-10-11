@@ -43,6 +43,7 @@ const gradeSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 gradeSchema.index({ studentId: 1, subject: 1 });
+gradeSchema.index({ studentId: 1, score: 1 });
 gradeSchema.index({ subject: 1, title: 1 });
 
 module.exports = mongoose.model('Grade', gradeSchema);

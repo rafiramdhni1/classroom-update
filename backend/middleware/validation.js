@@ -1,8 +1,12 @@
 const { z } = require('zod');
 
 const loginSchema = z.object({
-  nis: z.string().min(1, 'Nomor Induk harus diisi'),
+  nis: z.string().optional(),
+  nisn: z.string().optional(),
   password: z.string().min(1, 'Password harus diisi'),
+}).refine(data => data.nis || data.nisn, {
+  message: 'Nomor Induk / Username harus diisi',
+  path: ['nis'],
 });
 
 const changePasswordSchema = z.object({
@@ -11,18 +15,30 @@ const changePasswordSchema = z.object({
 });
 
 const forgotPasswordSchema = z.object({
-  nis: z.string().min(1, 'Nomor Induk harus diisi'),
+  nis: z.string().optional(),
+  nisn: z.string().optional(),
+}).refine(data => data.nis || data.nisn, {
+  message: 'NIS / NISN harus diisi',
+  path: ['nis'],
 });
 
 const verifyOtpSchema = z.object({
-  nis: z.string().min(1),
+  nis: z.string().optional(),
+  nisn: z.string().optional(),
   otp: z.string().length(6, 'OTP harus 6 digit'),
   newPassword: z.string().min(6, 'Password baru minimal 6 karakter'),
+}).refine(data => data.nis || data.nisn, {
+  message: 'NIS / NISN harus diisi',
+  path: ['nis'],
 });
 
 const fallbackVerifySchema = z.object({
-  nis: z.string().min(1, 'Nomor Induk harus diisi'),
+  nis: z.string().optional(),
+  nisn: z.string().optional(),
   orangTuaNama: z.string().min(1, 'Nama orang tua harus diisi'),
+}).refine(data => data.nis || data.nisn, {
+  message: 'NIS / NISN harus diisi',
+  path: ['nis'],
 });
 
 const createMessageSchema = z.object({
@@ -60,8 +76,23 @@ function validate(schema) {
       schema.parse(req.body);
       next();
     } catch (err) {
-      const errors = err.errors?.map(e => e.message) || [err.message];
-      res.status(400).json({ error: errors.join(', ') });
+      const issues = err.issues || err.errors;
+      let errorMsg = 'Data input tidak valid.';
+      if (Array.isArray(issues) && issues.length > 0) {
+        errorMsg = issues.map(e => e.message || 'Input tidak valid').join(', ');
+      } else if (typeof err.message === 'string') {
+        try {
+          const parsed = JSON.parse(err.message);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            errorMsg = parsed.map(p => p.message || p).join(', ');
+          } else {
+            errorMsg = err.message;
+          }
+        } catch {
+          errorMsg = err.message;
+        }
+      }
+      res.status(400).json({ error: errorMsg });
     }
   };
 }

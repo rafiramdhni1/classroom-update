@@ -20,7 +20,7 @@ function getRank(averages, studentId) {
 // GET /api/dashboard
 router.get('/', auth, async (req, res) => {
   try {
-    const student = await Student.findById(req.user.studentId);
+    const student = await Student.findById(req.user.studentId).lean();
     if (!student) {
       if (req.user.role === 'admin') {
         return res.json({ user: { role: 'admin', nisn: req.user.nisn }, student: null, grades: [], messages: [], subjectGrades: [], overallAverage: 0, classRank: { rank: 0, total: 0 }, angkatanRank: { rank: 0, total: 0 } });
@@ -29,28 +29,33 @@ router.get('/', auth, async (req, res) => {
     }
 
     const messages = await AdminMessage.find({
-      $or: [
-        { targetStudents: student._id },
-        { targetKelas: student.kelas },
-        { targetAngkatan: student.angkatan },
-        { isGlobal: true },
+      $and: [
+        {
+          $or: [
+            { targetStudents: student._id },
+            { targetKelas: student.kelas },
+            { targetAngkatan: student.angkatan },
+            { isGlobal: true },
+          ],
+        },
+        {
+          $or: [
+            { expiresAt: { $exists: false } },
+            { expiresAt: null },
+            { expiresAt: { $gt: new Date() } },
+          ],
+        },
       ],
-      $or: [
-        { expiresAt: { $exists: false } },
-        { expiresAt: { $gt: new Date() } },
-      ],
-    }).sort({ createdAt: -1 }).limit(20);
+    }).sort({ createdAt: -1 }).limit(20).lean();
 
-    const allCoursework = await CourseworkCache.find({});
+    const classmates = await Student.find({ kelas: student.kelas, isActive: true }).select('_id').lean();
+    const classmateIds = classmates.map(s => s._id);
 
-    const classmateIds = (await Student.find({ kelas: student.kelas, isActive: true }).select('_id'))
-      .map(s => s._id.toString());
+    const relevantCoursework = await CourseworkCache.find({
+      'studentSubmissions.studentId': { $in: classmateIds }
+    }).lean();
 
-    const relevantCoursework = allCoursework.filter(cw =>
-      cw.studentSubmissions.some(s => s.studentId && classmateIds.includes(s.studentId.toString()))
-    );
-
-    const manualGrades = await Grade.find({ studentId: student._id });
+    const manualGrades = await Grade.find({ studentId: student._id }).lean();
 
     const subjectGrades = {};
     let totalScore = 0;
@@ -69,7 +74,7 @@ router.get('/', auth, async (req, res) => {
       const components = [];
 
       for (const work of subjectWorks) {
-        const submission = work.studentSubmissions.find(
+        const submission = (work.studentSubmissions || []).find(
           s => s.studentId?.toString() === student._id.toString()
         );
 
@@ -130,8 +135,8 @@ router.get('/', auth, async (req, res) => {
 
     // --- RANKING OPTIMIZED ---
     const [studentsInClass, studentsInAngkatan] = await Promise.all([
-      Student.find({ kelas: student.kelas, isActive: true }).select('_id'),
-      Student.find({ angkatan: student.angkatan, isActive: true }).select('_id'),
+      Student.find({ kelas: student.kelas, isActive: true }).select('_id').lean(),
+      Student.find({ angkatan: student.angkatan, isActive: true }).select('_id').lean(),
     ]);
 
     const classIds = studentsInClass.map(s => s._id);
@@ -140,41 +145,51 @@ router.get('/', auth, async (req, res) => {
     const [classCoursework, angkatanCoursework, classManualGrades, angkatanManualGrades] = await Promise.all([
       CourseworkCache.find({
         'studentSubmissions.studentId': { $in: classIds },
-      }).select('studentSubmissions.studentId studentSubmissions.grade'),
+      }).select('studentSubmissions.studentId studentSubmissions.grade').lean(),
       angkatanIds.length !== classIds.length
         ? CourseworkCache.find({
             'studentSubmissions.studentId': { $in: angkatanIds },
-          }).select('studentSubmissions.studentId studentSubmissions.grade')
+          }).select('studentSubmissions.studentId studentSubmissions.grade').lean()
         : null,
-      Grade.find({ studentId: { $in: classIds } }).select('studentId score'),
+      Grade.find({ studentId: { $in: classIds } }).select('studentId score').lean(),
       angkatanIds.length !== classIds.length
-        ? Grade.find({ studentId: { $in: angkatanIds } }).select('studentId score')
+        ? Grade.find({ studentId: { $in: angkatanIds } }).select('studentId score').lean()
         : null,
     ]);
 
     function calculateAveragesWithManual(ids, coursework, manualGrades) {
-      const averages = {};
+      const stats = new Map();
       for (const sid of ids) {
-        let total = 0;
-        let count = 0;
+        stats.set(sid.toString(), { total: 0, count: 0 });
+      }
+      if (coursework) {
         for (const cw of coursework) {
-          const sub = cw.studentSubmissions.find(
-            s => s.studentId?.toString() === sid.toString()
-          );
-          if (sub && sub.grade !== undefined && sub.grade !== null) {
-            total += sub.grade;
-            count++;
-          }
-        }
-        if (manualGrades) {
-          for (const mg of manualGrades) {
-            if (mg.studentId?.toString() === sid.toString() && mg.score != null) {
-              total += mg.score;
-              count++;
+          if (!cw.studentSubmissions) continue;
+          for (const sub of cw.studentSubmissions) {
+            if (sub.grade === undefined || sub.grade === null) continue;
+            const sKey = sub.studentId?.toString();
+            const st = stats.get(sKey);
+            if (st) {
+              st.total += sub.grade;
+              st.count++;
             }
           }
         }
-        averages[sid.toString()] = count > 0 ? total / count : 0;
+      }
+      if (manualGrades) {
+        for (const mg of manualGrades) {
+          if (mg.score === null || mg.score === undefined) continue;
+          const sKey = mg.studentId?.toString();
+          const st = stats.get(sKey);
+          if (st) {
+            st.total += mg.score;
+            st.count++;
+          }
+        }
+      }
+      const averages = {};
+      for (const [sid, st] of stats.entries()) {
+        averages[sid] = st.count > 0 ? st.total / st.count : 0;
       }
       return averages;
     }
@@ -190,15 +205,26 @@ router.get('/', auth, async (req, res) => {
     const classRank = getRank(classAverages, student._id);
     const angkatanRank = getRank(angkatanAverages, student._id);
 
-    const waLink = `https://wa.me/${process.env.ADMIN_PHONE}?text=${encodeURIComponent('Halo Admin, saya ingin bertanya tentang sistem akademik.')}`;
+    const adminPhone1 = process.env.ADMIN_PHONE || '6288233182147';
+    const adminPhone2 = process.env.ADMIN_PHONE_2 || '6285641408175';
+    const waLink = `https://wa.me/${adminPhone1}?text=${encodeURIComponent('Halo Admin, saya ingin bertanya tentang sistem akademik.')}`;
+    const waLink2 = `https://wa.me/${adminPhone2}?text=${encodeURIComponent('Halo Admin, saya ingin bertanya tentang sistem akademik.')}`;
 
     res.json({
       student: {
+        id: student._id,
+        _id: student._id,
+        nis: student.nis,
+        nisn: student.nisn,
         nama: student.nama,
         kelas: student.kelas,
         angkatan: student.angkatan,
       },
       adminContact: waLink,
+      adminContacts: [
+        { label: 'Admin 1', phone: '0882-3318-2147', url: waLink },
+        { label: 'Admin 2', phone: '0856-4140-8175', url: waLink2 },
+      ],
       messages,
       subjectGrades,
       overallAverage,
@@ -233,6 +259,142 @@ router.put('/messages/:messageId/read', auth, async (req, res) => {
 
     res.json({ message: 'Pesan ditandai sudah dibaca.' });
   } catch (error) {
+    res.status(500).json({ error: 'Terjadi kesalahan server.' });
+  }
+});
+
+router.get('/missing-tasks', auth, async (req, res) => {
+  try {
+    if (req.user.role === 'admin') {
+      return res.status(403).json({ error: 'Admin tidak dapat mengakses endpoint ini.' });
+    }
+
+    const student = await Student.findById(req.user.studentId).lean();
+    if (!student) {
+      return res.status(404).json({ error: 'Data siswa tidak ditemukan.' });
+    }
+
+    const allCoursework = await CourseworkCache.find({
+      'studentSubmissions.studentId': student._id,
+    }).sort({ lastSyncedAt: -1 }).lean();
+
+    const seen = new Set();
+    const deduped = [];
+    for (const cw of allCoursework) {
+      if (seen.has(cw.classroomWorkId)) continue;
+      seen.add(cw.classroomWorkId);
+      deduped.push(cw);
+    }
+
+    const now = new Date();
+    const missing = [];
+
+    for (const cw of deduped) {
+      const sub = cw.studentSubmissions.find(
+        s => s.studentId?.toString() === student._id.toString()
+      );
+
+      const isSubmitted = sub && ['TURNED_IN', 'RETURNED'].includes(sub.state);
+      const isGraded = sub && sub.grade !== null && sub.grade !== undefined;
+
+      if (!isSubmitted) {
+        const dueDate = cw.dueDate ? new Date(cw.dueDate) : null;
+        const isOverdue = dueDate && dueDate < now;
+        const daysUntilDue = dueDate ? Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24)) : null;
+
+        missing.push({
+          id: cw.classroomWorkId,
+          title: cw.title,
+          subject: cw.courseAlias,
+          courseName: cw.courseName,
+          dueDate: cw.dueDate,
+          hasDueDate: Boolean(cw.dueDate),
+          overdue: isOverdue,
+          daysUntilDue,
+          workType: cw.workType,
+          maxPoints: cw.maxPoints || 100,
+          state: sub?.state || 'NEW',
+          submittedAt: sub?.submittedAt || null,
+        });
+      }
+    }
+
+    const overdueCount = missing.filter(t => t.overdue).length;
+    const dueSoonCount = missing.filter(t => !t.overdue && t.daysUntilDue !== null && t.daysUntilDue <= 3).length;
+    const noDueDateCount = missing.filter(t => !t.hasDueDate).length;
+
+    res.json({
+      missing,
+      summary: {
+        total: missing.length,
+        overdue: overdueCount,
+        dueSoon: dueSoonCount,
+        noDueDate: noDueDateCount,
+      },
+    });
+  } catch (error) {
+    console.error('Missing tasks error:', error);
+    res.status(500).json({ error: 'Terjadi kesalahan server.' });
+  }
+});
+
+// GET /api/dashboard/export-csv
+
+// POST /api/dashboard/push/subscribe - daftarkan push subscription
+router.post('/push/subscribe', auth, async (req, res) => {
+  try {
+    if (req.user.role === 'admin') {
+      return res.status(403).json({ error: 'Admin tidak dapat berlangganan push.' });
+    }
+
+    const { subscription } = req.body;
+    if (!subscription || !subscription.endpoint || !subscription.keys) {
+      return res.status(400).json({ error: 'Format subscription tidak valid.' });
+    }
+
+    const userAgent = req.headers['user-agent'] || '';
+    const { subscribeStudent } = require('../services/webpush');
+    await subscribeStudent(req.user.studentId, subscription, userAgent);
+
+    res.json({ message: 'Berlangganan push berhasil.' });
+  } catch (error) {
+    console.error('Push subscribe error:', error);
+    res.status(500).json({ error: 'Terjadi kesalahan server.' });
+  }
+});
+
+// DELETE /api/dashboard/push/unsubscribe - hapus push subscription
+router.delete('/push/unsubscribe', auth, async (req, res) => {
+  try {
+    if (req.user.role === 'admin') {
+      return res.status(403).json({ error: 'Admin tidak dapat berlangganan push.' });
+    }
+
+    const { endpoint } = req.body;
+    if (!endpoint) {
+      return res.status(400).json({ error: 'Endpoint wajib diisi.' });
+    }
+
+    const { unsubscribeStudent } = require('../services/webpush');
+    await unsubscribeStudent(req.user.studentId, endpoint);
+
+    res.json({ message: 'Berhenti berlangganan push berhasil.' });
+  } catch (error) {
+    console.error('Push unsubscribe error:', error);
+    res.status(500).json({ error: 'Terjadi kesalahan server.' });
+  }
+});
+
+// GET /api/dashboard/push/vapid-key - dapatkan VAPID public key
+router.get('/push/vapid-key', auth, async (req, res) => {
+  try {
+    const { VAPID_PUBLIC_KEY } = require('../services/webpush');
+    if (!VAPID_PUBLIC_KEY) {
+      return res.status(503).json({ error: 'Push notification belum dikonfigurasi.' });
+    }
+    res.json({ publicKey: VAPID_PUBLIC_KEY });
+  } catch (error) {
+    console.error('VAPID key error:', error);
     res.status(500).json({ error: 'Terjadi kesalahan server.' });
   }
 });

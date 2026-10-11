@@ -13,6 +13,8 @@ const {
   bulkCreateSchema,
 } = require('../middleware/validation');
 
+const { google } = require('googleapis');
+
 const router = express.Router();
 
 router.use(auth);
@@ -20,7 +22,7 @@ router.use(auth);
 // GET /api/admin/students
 router.get('/students', staffOnly, async (req, res) => {
   try {
-    const { kelas, angkatan, search, page = 1, limit = 50 } = req.query;
+    const { kelas, angkatan, search, classroomStatus, page = 1, limit = 50 } = req.query;
     const filter = { isActive: true };
 
     if (kelas) filter.kelas = kelas;
@@ -33,15 +35,134 @@ router.get('/students', staffOnly, async (req, res) => {
       ];
     }
 
-    const total = await Student.countDocuments(filter);
-    const students = await Student.find(filter)
-      .sort({ kelas: 1, nama: 1 })
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit));
+    if (classroomStatus === 'unlinked') {
+      const unlinkedCond = {
+        $or: [
+          { classroomId: { $exists: false } },
+          { classroomId: null },
+          { classroomId: '' },
+        ],
+      };
+      if (filter.$or) {
+        filter.$and = [{ $or: filter.$or }, unlinkedCond];
+        delete filter.$or;
+      } else {
+        Object.assign(filter, unlinkedCond);
+      }
+    } else if (classroomStatus === 'linked') {
+      const linkedCond = { classroomId: { $exists: true, $nin: [null, ''] } };
+      if (filter.$or) {
+        filter.$and = [{ $or: filter.$or }, linkedCond];
+        delete filter.$or;
+      } else {
+        Object.assign(filter, linkedCond);
+      }
+    }
 
-    res.json({ students, total, page: parseInt(page), totalPages: Math.ceil(total / limit) });
+    const baseFilter = { isActive: true };
+    if (kelas) baseFilter.kelas = kelas;
+    if (angkatan) baseFilter.angkatan = parseInt(angkatan);
+
+    const [total, students, unlinkedCount, totalCount] = await Promise.all([
+      Student.countDocuments(filter),
+      Student.find(filter)
+        .sort({ kelas: 1, nama: 1 })
+        .skip((page - 1) * limit)
+        .limit(parseInt(limit)),
+      Student.countDocuments({
+        ...baseFilter,
+        $or: [
+          { classroomId: { $exists: false } },
+          { classroomId: null },
+          { classroomId: '' },
+        ],
+      }),
+      Student.countDocuments(baseFilter),
+    ]);
+
+    res.json({
+      students,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / limit),
+      classroomStats: {
+        total: totalCount,
+        unlinked: unlinkedCount,
+        linked: Math.max(0, totalCount - unlinkedCount),
+      },
+    });
   } catch (error) {
     res.status(500).json({ error: 'Terjadi kesalahan server.' });
+  }
+});
+
+// GET /api/admin/unlinked-roster - Daftar akun Google Classroom yang belum terhubung ke database
+router.get('/unlinked-roster', staffOnly, async (req, res) => {
+  try {
+    let user = await User.findById(req.userId);
+    if (!user || !user.googleAccessToken) {
+      user = await User.findOne({ googleAccessToken: { $exists: true, $ne: null } });
+    }
+    if (!user || !user.googleAccessToken) {
+      return res.json({ unlinkedRoster: [], isConnected: false });
+    }
+
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_CALLBACK_URL
+    );
+    oauth2Client.setCredentials({
+      access_token: user.googleAccessToken,
+      refresh_token: user.googleRefreshToken,
+    });
+    const classroom = google.classroom({ version: 'v1', auth: oauth2Client });
+
+    const coursesRes = await classroom.courses.list({ pageSize: 50 });
+    const courses = coursesRes.data.courses || [];
+
+    const linkedStudents = await Student.find({
+      isActive: true,
+      classroomId: { $exists: true, $nin: [null, ''] },
+    }).select('classroomId').lean();
+    const usedClassroomIds = new Set(linkedStudents.map(s => String(s.classroomId).trim()));
+
+    const rosterMap = new Map();
+
+    for (const c of courses) {
+      try {
+        const rosterRes = await classroom.courses.students.list({
+          courseId: c.id,
+          pageSize: 100,
+          fields: 'students(userId,profile(name/fullName,emailAddress))',
+        });
+        const cStudents = rosterRes.data.students || [];
+        for (const s of cStudents) {
+          const uid = String(s.userId || '').trim();
+          if (!uid || usedClassroomIds.has(uid)) continue;
+
+          if (!rosterMap.has(uid)) {
+            rosterMap.set(uid, {
+              userId: uid,
+              nama: s.profile?.name?.fullName || '',
+              email: s.profile?.emailAddress || '',
+              courses: [c.name],
+            });
+          } else {
+            const entry = rosterMap.get(uid);
+            if (!entry.courses.includes(c.name)) entry.courses.push(c.name);
+          }
+        }
+      } catch (err) {
+        // Abaikan kursus yang gagal roster
+      }
+    }
+
+    const unlinkedRoster = Array.from(rosterMap.values()).sort((a, b) => a.nama.localeCompare(b.nama));
+    res.json({ unlinkedRoster, isConnected: true });
+  } catch (error) {
+    console.error('Unlinked roster error:', error.message);
+    res.json({ unlinkedRoster: [], isConnected: false, error: error.message });
   }
 });
 
@@ -50,7 +171,39 @@ router.put('/students/:id', staffOnly, async (req, res) => {
   try {
     const { nama, kelas, nisn, nis, orangTuaNama, orangTuaTelepon, classroomId } = req.body;
     const updateData = { nama, kelas, nisn, nis, orangTuaNama, orangTuaTelepon };
-    if (classroomId !== undefined) updateData.classroomId = classroomId;
+    if (classroomId !== undefined) {
+      let resolvedId = String(classroomId || '').trim();
+      if (resolvedId && resolvedId.includes('@')) {
+        try {
+          const userObj = await User.findOne({ googleAccessToken: { $exists: true, $ne: null } });
+          if (userObj) {
+            const oauth2Client = new google.auth.OAuth2(
+              process.env.GOOGLE_CLIENT_ID,
+              process.env.GOOGLE_CLIENT_SECRET,
+              process.env.GOOGLE_CALLBACK_URL
+            );
+            oauth2Client.setCredentials({
+              access_token: userObj.googleAccessToken,
+              refresh_token: userObj.googleRefreshToken,
+            });
+            const classroom = google.classroom({ version: 'v1', auth: oauth2Client });
+            const coursesRes = await classroom.courses.list({ pageSize: 50 });
+            for (const c of (coursesRes.data.courses || [])) {
+              try {
+                const sRes = await classroom.courses.students.get({ courseId: c.id, userId: resolvedId });
+                if (sRes.data?.userId) {
+                  resolvedId = sRes.data.userId;
+                  break;
+                }
+              } catch (_) {}
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to resolve email to classroomId:', err.message);
+        }
+      }
+      updateData.classroomId = resolvedId;
+    }
     const student = await Student.findByIdAndUpdate(
       req.params.id,
       updateData,

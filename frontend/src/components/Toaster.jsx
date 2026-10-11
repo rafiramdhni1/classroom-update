@@ -24,29 +24,29 @@ const toast = {
 
 const styles = {
   success: {
-    container: 'border-green-500',
-    iconBg: 'bg-green-100 text-green-600',
-    bar: 'bg-green-500',
+    container: 'border-l-success',
+    iconBg: 'bg-success-soft text-success',
+    bar: 'bg-success',
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
       </svg>
     ),
   },
   error: {
-    container: 'border-red-500',
-    iconBg: 'bg-red-100 text-red-600',
-    bar: 'bg-red-500',
+    container: 'border-l-danger',
+    iconBg: 'bg-danger-soft text-danger',
+    bar: 'bg-danger',
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
       </svg>
     ),
   },
   info: {
-    container: 'border-blue-500',
-    iconBg: 'bg-blue-100 text-blue-600',
-    bar: 'bg-blue-500',
+    container: 'border-l-info',
+    iconBg: 'bg-info-soft text-info',
+    bar: 'bg-info',
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
@@ -63,16 +63,16 @@ function ToastItem({ item, onClose }) {
   }, [onClose]);
 
   return (
-    <div className={`relative overflow-hidden flex items-start gap-3 pl-4 pr-3 py-3 bg-white rounded-xl shadow-lg border-l-4 ${s.container} transform transition-all duration-300 animate-[slideIn_.3s_ease-out]`}>
-      <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${s.iconBg}`}>{s.icon}</div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-800">
+    <div className={`card relative flex items-start gap-3 overflow-hidden rounded-2xl border-l-4 py-3 pl-4 pr-3 transition-all duration-300 animate-[slideIn_.3s_ease-out] ${s.container}`}>
+      <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${s.iconBg}`}>{s.icon}</div>
+      <div className="min-w-0 flex-1">
+        <p className="font-display text-sm font-bold text-ink">
           {item.type === 'success' ? 'Berhasil' : item.type === 'error' ? 'Gagal' : 'Info'}
         </p>
-        <p className="text-sm text-gray-600 mt-0.5 whitespace-pre-line break-words">{item.message}</p>
+        <p className="mt-0.5 whitespace-pre-line break-words text-sm text-muted">{item.message}</p>
       </div>
-      <button onClick={onClose} className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors" aria-label="Tutup">
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <button onClick={onClose} className="shrink-0 text-muted transition-colors hover:text-ink" aria-label="Tutup">
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>

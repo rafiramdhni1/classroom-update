@@ -25,7 +25,7 @@ router.get('/', auth, staffOnly, async (req, res) => {
     const studentGrades = students.map(s => {
       const sGrades = grades.filter(g => g.studentId?._id?.toString() === s._id.toString());
       return {
-        student: { _id: s._id, nis: s.nis, nama: s.nama, kelas: s.kelas },
+        student: { _id: s._id, nis: s.nis, nisn: s.nisn, nama: s.nama, kelas: s.kelas },
         grades: sGrades.map(g => ({
           _id: g._id,
           title: g.title,

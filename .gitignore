@@ -5,8 +5,8 @@ frontend/node_modules/
 
 # Environment
 .env
-.env.local
-.env.*.local
+.env*
+*.archive.gz
 
 # Logs
 logs/
@@ -48,6 +48,7 @@ coverage/
 .nyc_output/
 
 # Misc
+~$*
 *.pid
 *.seed
 *.pid.lock

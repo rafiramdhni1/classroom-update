@@ -106,11 +106,11 @@ router.post('/change-password', auth, validate(changePasswordSchema), async (req
 // POST /api/auth/forgot-password - kirim OTP ke Telegram
 router.post('/forgot-password', validate(forgotPasswordSchema), async (req, res) => {
   try {
-    const { nisn } = req.body;
+    const loginId = req.body.nis || req.body.nisn;
 
-    const user = await User.findOne({ nisn });
+    const user = await User.findOne({ $or: [{ nisn: loginId }, { nis: loginId }] });
     if (!user) {
-      return res.status(404).json({ error: 'NISN tidak ditemukan.' });
+      return res.status(404).json({ error: 'NIS / NISN tidak ditemukan.' });
     }
 
     const otp = crypto.randomInt(100000, 999999).toString();
@@ -156,11 +156,12 @@ router.post('/forgot-password', validate(forgotPasswordSchema), async (req, res)
 // POST /api/auth/verify-otp
 router.post('/verify-otp', validate(verifyOtpSchema), async (req, res) => {
   try {
-    const { nisn, otp, newPassword } = req.body;
+    const loginId = req.body.nis || req.body.nisn;
+    const { otp, newPassword } = req.body;
 
-    const user = await User.findOne({ nisn });
+    const user = await User.findOne({ $or: [{ nisn: loginId }, { nis: loginId }] });
     if (!user) {
-      return res.status(404).json({ error: 'NISN tidak ditemukan.' });
+      return res.status(404).json({ error: 'NIS / NISN tidak ditemukan.' });
     }
 
     if (user.resetPasswordOtp !== otp) {
@@ -186,11 +187,12 @@ router.post('/verify-otp', validate(verifyOtpSchema), async (req, res) => {
 // POST /api/auth/fallback-verify - verifikasi NISN + faktor tambahan
 router.post('/fallback-verify', validate(fallbackVerifySchema), async (req, res) => {
   try {
-    const { nisn, orangTuaNama } = req.body;
+    const loginId = req.body.nis || req.body.nisn;
+    const { orangTuaNama } = req.body;
 
-    const student = await Student.findOne({ nisn });
+    const student = await Student.findOne({ $or: [{ nisn: loginId }, { nis: loginId }] });
     if (!student) {
-      return res.status(404).json({ error: 'NISN tidak ditemukan.' });
+      return res.status(404).json({ error: 'Data siswa tidak ditemukan.' });
     }
 
     if (student.orangTuaNama?.toLowerCase().trim() !== orangTuaNama.toLowerCase().trim()) {
@@ -298,12 +300,12 @@ router.get('/google/callback', async (req, res) => {
     await user.save();
 
     // Redirect ke frontend dengan status sukses
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    res.redirect(`${frontendUrl}?google_auth=success`);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${frontendUrl}/admin?google_auth=success`);
   } catch (error) {
     console.error('Google callback error:', error);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    res.redirect(`${frontendUrl}?google_auth=error`);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${frontendUrl}/admin?google_auth=error`);
   }
 });
 

@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dokumentasi Arsitektur Backend - SIAKAD SMK TKJ</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @media print {
+      .no-print { display: none !important; }
+      body { background: #ffffff !important; color: #0f172a !important; font-size: 11pt; }
+      .tab-content { display: block !important; page-break-after: always; }
+      .card { border: 1px solid #cbd5e1 !important; box-shadow: none !important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- Header Banner -->
+  <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-xl font-bold tracking-tight text-white">SIAKAD SMK TKJ</h1>
+            <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Backend Architecture</span>
+          </div>
+          <p class="text-xs text-slate-400">Node.js 20 • Express.js • MongoDB 7 • Google Classroom & Telegram Bot</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-3 no-print">
+        <button onclick="window.print()" class="inline-flex items-center px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition shadow-md shadow-indigo-600/20 gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+          </svg>
+          Cetak / Simpan PDF
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- Key Metrics Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+      <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60 backdrop-blur">
+        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Arsitektur</p>
+        <p class="text-lg font-bold text-white mt-1">REST API + Stateless JWT</p>
+        <p class="text-[11px] text-emerald-400 mt-0.5">High Performance & Scalable</p>
+      </div>
+      <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60 backdrop-blur">
+        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Basis Data</p>
+        <p class="text-lg font-bold text-cyan-400 mt-1">MongoDB 7 (Mongoose)</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">8 Collections + Compound Index</p>
+      </div>
+      <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60 backdrop-blur">
+        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Integrasi Eksternal</p>
+        <p class="text-lg font-bold text-amber-400 mt-1">Google & Telegram API</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">OAuth2 + Long-polling daemon</p>
+      </div>
+      <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60 backdrop-blur">
+        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Infrastruktur</p>
+        <p class="text-lg font-bold text-indigo-400 mt-1">Docker Compose</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">Nginx Proxy + Cloudflare SSL</p>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="no-print flex overflow-x-auto space-x-2 border-b border-slate-800 pb-2 mb-6 scrollbar-thin">
+      <button onclick="switchTab('tab-arsitektur')" id="btn-tab-arsitektur" class="tab-btn px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-indigo-600 text-white transition">
+        1. Ringkasan & Prinsip
+      </button>
+      <button onclick="switchTab('tab-pipeline')" id="btn-tab-pipeline" class="tab-btn px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+        2. Pipeline Server.js & Cron
+      </button>
+      <button onclick="switchTab('tab-keamanan')" id="btn-tab-keamanan" class="tab-btn px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+        3. Keamanan & RBAC
+      </button>
+      <button onclick="switchTab('tab-database')" id="btn-tab-database" class="tab-btn px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+        4. Skema Database (8 Model)
+      </button>
+      <button onclick="switchTab('tab-routes')" id="btn-tab-routes" class="tab-btn px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+        5. Router & Logika Bisnis
+      </button>
+      <button onclick="switchTab('tab-services')" id="btn-tab-services" class="tab-btn px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+        6. Integrasi Google & Telegram
+      </button>
+    </div>
+
+    <!-- ==================== TAB 1: ARSITEKTUR ==================== -->
+    <section id="tab-arsitektur" class="tab-content space-y-6">
+      <div class="bg-slate-800/40 border border-slate-700/60 rounded-2xl p-6">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+          Karakteristik & Pola Desain Backend
+        </h2>
+        <p class="text-sm text-slate-300 mt-2 leading-relaxed">
+          Backend Sistem Informasi Akademik SMK TKJ dibangun dengan pendekatan modular <strong>Separation of Concerns (SoC)</strong>, memastikan setiap lapisan (routing, validasi, logika bisnis, dan interaksi basis data) beroperasi secara independen dan terisolasi.
+        </p>
+
+        <div class="grid md:grid-cols-3 gap-4 mt-6">
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+            <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-sm mb-3">01</div>
+            <h3 class="text-sm font-semibold text-white">Stateless RESTful</h3>
+            <p class="text-xs text-slate-400 mt-1 leading-relaxed">
+              Setiap panggilan API bersifat mandiri menggunakan token JWT di header Authorization. Server tidak membebani RAM dengan sesi memori, memungkinkan respons cepat dan keandalan tinggi.
+            </p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+            <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-sm mb-3">02</div>
+            <h3 class="text-sm font-semibold text-white">Decoupled Worker</h3>
+            <p class="text-xs text-slate-400 mt-1 leading-relaxed">
+              Bot Telegram berjalan di proses mandiri (<code class="text-cyan-300 font-mono">bot-poll.js</code>). Jika koneksi ke server Telegram mengalami timeout, server web Express tetap melayani portal akademik siswa tanpa gangguan.
+            </p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm mb-3">03</div>
+            <h3 class="text-sm font-semibold text-white">Compound Caching</h3>
+            <p class="text-xs text-slate-400 mt-1 leading-relaxed">
+              Data tugas Google Classroom disimpan secara lokal di koleksi <code class="text-emerald-300 font-mono">CourseworkCache</code> dengan masa kedaluwarsa 5 menit, melindungi server dari blokir rate limit Google API.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 2: PIPELINE SERVER ==================== -->
+    <section id="tab-pipeline" class="tab-content hidden space-y-6">
+      <div class="bg-slate-800/40 border border-slate-700/60 rounded-2xl p-6">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-cyan-500"></span>
+          Pipeline Middleware & Alur Request (server.js)
+        </h2>
+        <p class="text-sm text-slate-300 mt-2">
+          Urutan eksekusi middleware pada setiap paket HTTP yang diterima server:
+        </p>
+
+        <div class="mt-6 space-y-3 font-mono text-xs">
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 flex items-start gap-3">
+            <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-bold">1</span>
+            <div>
+              <p class="text-white font-semibold">app.set('trust proxy', 1)</p>
+              <p class="text-slate-400 font-sans text-xs mt-0.5">Memastikan Express membaca IP asli siswa/guru saat berada di balik Nginx Reverse Proxy dan Cloudflare.</p>
+            </div>
+          </div>
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 flex items-start gap-3">
+            <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-bold">2</span>
+            <div>
+              <p class="text-white font-semibold">compression()</p>
+              <p class="text-slate-400 font-sans text-xs mt-0.5">Kompresi Gzip otomatis untuk seluruh payload JSON. Mempercepat muat halaman dan memotong penggunaan kuota data hingga 80%.</p>
+            </div>
+          </div>
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 flex items-start gap-3">
+            <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-bold">3</span>
+            <div>
+              <p class="text-white font-semibold">cors({ origin: [FRONTEND_URL, ...], credentials: true })</p>
+              <p class="text-slate-400 font-sans text-xs mt-0.5">Pengamanan Cross-Origin Resource Sharing. Menolak request ilegal dari domain asing yang tidak terdaftar.</p>
+            </div>
+          </div>
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 flex items-start gap-3">
+            <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold">4</span>
+            <div>
+              <p class="text-white font-semibold">Multi-Tier Rate Limiting (express-rate-limit)</p>
+              <p class="text-slate-400 font-sans text-xs mt-0.5">• Global: 200 req / 15 menit<br>• Login (/api/auth/login): 100 req / 15 menit (mencegah brute force)<br>• Lupa Password (/api/auth/forgot-password): 5 req / 15 menit (mencegah spam OTP Telegram)</p>
+            </div>
+          </div>
+          <div class="p-3 rounded-lg bg-slate-900 border border-slate-800 flex items-start gap-3">
+            <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">5</span>
+            <div>
+              <p class="text-white font-semibold">Performance Logger (Winston & Monitoring)</p>
+              <p class="text-slate-400 font-sans text-xs mt-0.5">Mencatat durasi request dalam milidetik (ms). Jika respon menghasilkan status 500+, otomatis dicatat ke koleksi database error.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cron Schedule Card -->
+        <div class="mt-8 border-t border-slate-800 pt-6">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Tugas Latar Belakang Terjadwal (node-cron)
+          </h3>
+          <div class="grid sm:grid-cols-2 gap-3 mt-4 text-xs">
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+              <span class="font-mono text-cyan-400 font-bold">0 7 * * 1-5 (07:00 WIB)</span>
+              <p class="text-slate-300 font-medium mt-1">Classroom Sync Otomatis</p>
+              <p class="text-slate-400 text-[11px] mt-0.5">Menarik daftar tugas dan batas pengumpulan terbaru dari Google Classroom setiap pagi sebelum KBM.</p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+              <span class="font-mono text-indigo-400 font-bold">0 10 * * * (10:00 WIB)</span>
+              <p class="text-slate-300 font-medium mt-1">Web Push Notification</p>
+              <p class="text-slate-400 text-[11px] mt-0.5">Mengirim push notification langsung ke HP Android siswa jika ada tugas yang mendekati batas waktu.</p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+              <span class="font-mono text-amber-400 font-bold">0 17 * * 1-5 (17:00 WIB)</span>
+              <p class="text-slate-300 font-medium mt-1">Notifikasi Telegram Harian</p>
+              <p class="text-slate-400 text-[11px] mt-0.5">Bot Telegram mengirim rekap tugas yang belum selesai kepada siswa/orang tua setiap sore hari.</p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+              <span class="font-mono text-emerald-400 font-bold">0 2 * * * (02:00 WIB)</span>
+              <p class="text-slate-300 font-medium mt-1">Backup Database Otomatis</p>
+              <p class="text-slate-400 text-[11px] mt-0.5">Mengekspor seluruh koleksi database ke JSON terarsip dan membersihkan file cadangan berusia >30 hari.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 3: KEAMANAN & RBAC ==================== -->
+    <section id="tab-keamanan" class="tab-content hidden space-y-6">
+      <div class="bg-slate-800/40 border border-slate-700/60 rounded-2xl p-6">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+          Sistem Keamanan, Autentikasi, & RBAC (Role-Based Access Control)
+        </h2>
+
+        <div class="grid md:grid-cols-2 gap-6 mt-6">
+          <div class="space-y-4">
+            <h3 class="text-sm font-semibold text-white uppercase tracking-wider text-xs">Mekanisme Otorisasi Token</h3>
+            <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs space-y-2">
+              <p class="text-slate-300"><strong class="text-white">Format Token:</strong> Bearer Token JWT dengan payload ID pengguna.</p>
+              <p class="text-slate-300"><strong class="text-white">Masa Berlaku:</strong> 7 hari (<code class="text-cyan-300">expiresIn: '7d'</code>).</p>
+              <p class="text-slate-300"><strong class="text-white">Ekstraksi Efisien:</strong> Menggunakan query <code class="text-emerald-300">User.findById(id).select('-password').lean()</code> untuk memotong alokasi memori berlebih dan mencegah kebocoran hash password.</p>
+            </div>
+
+            <h3 class="text-sm font-semibold text-white uppercase tracking-wider text-xs pt-2">Hierarki Hak Akses (RBAC)</h3>
+            <div class="space-y-2 text-xs">
+              <div class="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-slate-200">
+                <span class="font-bold text-red-400 font-mono">[adminOnly]</span>
+                <p class="text-slate-400 text-[11px] mt-0.5">CRUD siswa, generate kode aktivasi telegram, manajemen akun guru, import data, backup, dan monitoring server.</p>
+              </div>
+              <div class="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-slate-200">
+                <span class="font-bold text-amber-400 font-mono">[staffOnly]</span>
+                <p class="text-slate-400 text-[11px] mt-0.5">Terbuka untuk guru dan admin: Input nilai manual (spreadsheet), sync nilai Classroom, dan export rekap Excel.</p>
+              </div>
+              <div class="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-slate-200">
+                <span class="font-bold text-indigo-400 font-mono">[auth]</span>
+                <p class="text-slate-400 text-[11px] mt-0.5">Terbuka untuk semua akun terotentikasi: Dashboard siswa, pengecekan peringkat, dan detail tugas.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-4">
+            <h3 class="text-sm font-semibold text-white uppercase tracking-wider text-xs">Enkripsi & Validasi Skema (Zod)</h3>
+            <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs space-y-3">
+              <div>
+                <p class="text-white font-semibold">1. Password Hashing (bcryptjs)</p>
+                <p class="text-slate-400 mt-1">Password diamankan dengan algoritma satu arah bcrypt (10 rounds salt). Password asli tidak pernah tersimpan di database.</p>
+              </div>
+              <div class="border-t border-slate-800 pt-3">
+                <p class="text-white font-semibold">2. Validasi Skema Input (Zod)</p>
+                <p class="text-slate-400 mt-1">Sebelum data diproses controller, Zod memeriksa tipe data, panjang string, dan pola karakter:</p>
+                <ul class="list-disc list-inside text-slate-400 text-[11px] mt-1 space-y-1">
+                  <li><code class="text-cyan-300">loginSchema</code>: Validasi NIS/NISN & password.</li>
+                  <li><code class="text-cyan-300">forgotPasswordSchema</code>: Mencegah manipulasi NIS.</li>
+                  <li><code class="text-cyan-300">verifyOtpSchema</code>: Validasi kode OTP 6 digit.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 4: DATABASE MODELS ==================== -->
+    <section id="tab-database" class="tab-content hidden space-y-6">
+      <div class="bg-slate-800/40 border border-slate-700/60 rounded-2xl p-6">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+          Koleksi Database MongoDB (Mongoose Schema)
+        </h2>
+        <p class="text-sm text-slate-300 mt-2">
+          Struktur 8 model dokumen di dalam database <code class="text-cyan-300 font-mono">smk_akademik</code>:
+        </p>
+
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-xs font-mono font-bold text-indigo-400">1. User</span>
+            <p class="text-xs text-white font-semibold mt-1">Akun Autentikasi</p>
+            <p class="text-[11px] text-slate-400 mt-1">Menyimpan NISN, hash bcrypt, role (admin/guru/student), dan token OAuth Google.</p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-xs font-mono font-bold text-cyan-400">2. Student</span>
+            <p class="text-xs text-white font-semibold mt-1">Data Induk Siswa</p>
+            <p class="text-[11px] text-slate-400 mt-1">NIS, nama lengkap, kelas, rombel, angkatan, dan mapping classroomId.</p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-xs font-mono font-bold text-emerald-400">3. Grade</span>
+            <p class="text-xs text-white font-semibold mt-1">Nilai Manual Guru</p>
+            <p class="text-[11px] text-slate-400 mt-1">Nilai UTS, UAS, Praktik untuk 5 mata pelajaran produktif (ASJ, AIJ, TJBL, PKDK, TJKT).</p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-xs font-mono font-bold text-amber-400">4. CourseworkCache</span>
+            <p class="text-xs text-white font-semibold mt-1">Cache Tugas Classroom</p>
+            <p class="text-[11px] text-slate-400 mt-1">ID tugas, judul, batas waktu, dan array submissions status pengerjaan siswa.</p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-xs font-mono font-bold text-sky-400">5. ChatId</span>
+            <p class="text-xs text-white font-semibold mt-1">Relasi Bot Telegram</p>
+            <p class="text-[11px] text-slate-400 mt-1">Menghubungkan NIS siswa dengan Chat ID Telegram untuk notifikasi pribadi.</p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-xs font-mono font-bold text-pink-400">6. ActivationCode</span>
+            <p class="text-xs text-white font-semibold mt-1">Token Aktivasi Bot</p>
+            <p class="text-[11px] text-slate-400 mt-1">Kode heksadesimal acak untuk verifikasi pendaftaran Telegram siswa.</p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-xs font-mono font-bold text-purple-400">7. PushSubscription</span>
+            <p class="text-xs text-white font-semibold mt-1">Web Push Browser</p>
+            <p class="text-[11px] text-slate-400 mt-1">Menyimpan endpoint browser & public keys VAPID untuk notifikasi HP.</p>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-xs font-mono font-bold text-teal-400">8. AdminMessage</span>
+            <p class="text-xs text-white font-semibold mt-1">Pesan Pengumuman</p>
+            <p class="text-[11px] text-slate-400 mt-1">Pesan prioritas dari sekolah dengan filter target kelas dan tanggal kedaluwarsa.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 5: ROUTERS ==================== -->
+    <section id="tab-routes" class="tab-content hidden space-y-6">
+      <div class="bg-slate-800/40 border border-slate-700/60 rounded-2xl p-6">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+          Penanganan Rute & Logika Bisnis (routes/)
+        </h2>
+
+        <div class="mt-6 overflow-x-auto">
+          <table class="w-full text-left text-xs border border-slate-800">
+            <thead class="bg-slate-900 text-slate-400 uppercase font-mono">
+              <tr>
+                <th class="p-3 border-b border-slate-800">Modul Route</th>
+                <th class="p-3 border-b border-slate-800">Endpoint Kunci</th>
+                <th class="p-3 border-b border-slate-800">Fungsi & Logika Bisnis</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800 text-slate-300">
+              <tr>
+                <td class="p-3 font-mono text-cyan-300 font-semibold">routes/auth.js</td>
+                <td class="p-3 font-mono">POST /login<br>POST /forgot-password<br>GET /google/callback</td>
+                <td class="p-3">Verifikasi kredensial bcrypt, penerbitan JWT, pengiriman OTP reset sandi via Telegram, dan siklus OAuth2 Google.</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-mono text-cyan-300 font-semibold">routes/dashboard.js</td>
+                <td class="p-3 font-mono">GET /</td>
+                <td class="p-3">Agregasi data nilai multi-sumber, kalkulasi rata-rata, penentuan peringkat kelas & angkatan secara dinamis O(N+M).</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-mono text-cyan-300 font-semibold">routes/grades.js</td>
+                <td class="p-3 font-mono">POST /bulk<br>GET /class</td>
+                <td class="p-3">Penyimpanan nilai massal dengan <code class="text-amber-300 font-mono">bulkWrite()</code> untuk input cepat antarmuka spreadsheet guru.</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-mono text-cyan-300 font-semibold">routes/classroomGrades.js</td>
+                <td class="p-3 font-mono">GET /export</td>
+                <td class="p-3">Ekspor nilai rekapitulasi Google Classroom ke berkas Excel yang diformat rapi (warna, border, rumus rata-rata).</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-mono text-cyan-300 font-semibold">routes/analytics.js</td>
+                <td class="p-3 font-mono">GET /missing-tasks</td>
+                <td class="p-3">Mendeteksi tugas-tugas siswa yang belum dikumpulkan (<code class="text-rose-400">MISSING</code>) menjelang deadline.</td>
+              </tr>
+              <tr>
+                <td class="p-3 font-mono text-cyan-300 font-semibold">routes/tools.js</td>
+                <td class="p-3 font-mono">GET /monitoring<br>POST /backup</td>
+                <td class="p-3">Pemantauan metrik server di memori (CPU, RAM, Uptime) dan trigger pencadangan database manual.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 6: SERVICES EKSTERNAL ==================== -->
+    <section id="tab-services" class="tab-content hidden space-y-6">
+      <div class="bg-slate-800/40 border border-slate-700/60 rounded-2xl p-6">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-indigo-400"></span>
+          Rekayasa Integrasi Google Classroom & Telegram Bot
+        </h2>
+
+        <div class="grid md:grid-cols-2 gap-6 mt-6">
+          <!-- Google Classroom Service -->
+          <div class="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/></svg>
+                Google Classroom Engine (classroom.js)
+              </h3>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">OAuth2 API</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Mengatasi batasan kuota Google API dengan rekayasa khusus:
+            </p>
+            <ul class="text-xs text-slate-300 space-y-2 mt-2">
+              <li class="flex items-start gap-2">
+                <span class="text-emerald-400 font-bold">•</span>
+                <span><strong>Concurrency Control:</strong> Request paralel dibatasi 4 kelas (<code class="text-cyan-300 font-mono">COURSE_CONCURRENCY: 4</code>) dan 6 tugas (<code class="text-cyan-300 font-mono">WORK_CONCURRENCY: 6</code>).</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-emerald-400 font-bold">•</span>
+                <span><strong>Exponential Backoff:</strong> Jika menerima HTTP status 429 (Rate Limit), sistem otomatis melakukan jeda bertahap dan mencoba ulang hingga 3 kali.</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-emerald-400 font-bold">•</span>
+                <span><strong>Selective Field Masking:</strong> Hanya menarik field <code class="text-cyan-300 font-mono">id, title, dueDate, submissions</code>, memangkas beban payload hingga 60%.</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Telegram Bot Runner -->
+          <div class="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <svg class="w-4 h-4 text-sky-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
+                Telegram Bot Daemon (bot-poll.js)
+              </h3>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-sky-500/20 text-sky-300">Long Polling</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Daemon independen yang mendengarkan perintah siswa secara interaktif:
+            </p>
+            <ul class="text-xs text-slate-300 space-y-2 mt-2">
+              <li class="flex items-start gap-2">
+                <span class="text-sky-400 font-bold">•</span>
+                <span><code class="text-sky-300 font-mono">/start</code> & <code class="text-sky-300 font-mono">/help</code>: Menampilkan panduan dan opsi menu.</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-sky-400 font-bold">•</span>
+                <span><code class="text-sky-300 font-mono">/aktivasi &lt;kode&gt;</code>: Memvalidasi token aktivasi dan menautkan Chat ID siswa ke database.</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-sky-400 font-bold">•</span>
+                <span><code class="text-sky-300 font-mono">/nilai</code>: Menampilkan kartu nilai real-time dan daftar tagihan tugas langsung di obrolan Telegram.</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById(tabId).classList.remove('hidden');
+
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-indigo-600', 'text-white');
+        btn.classList.add('bg-slate-800', 'text-slate-300');
+      });
+      const activeBtn = document.getElementById('btn-' + tabId);
+      activeBtn.classList.remove('bg-slate-800', 'text-slate-300');
+      activeBtn.classList.add('bg-indigo-600', 'text-white');
+    }
+  </script>
+</body>
+</html>

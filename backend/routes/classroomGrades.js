@@ -17,9 +17,9 @@ router.get('/', auth, staffOnly, async (req, res) => {
       filter.courseAlias = { $in: req.user.subjects };
     }
 
-    const coursework = await CourseworkCache.find(filter).sort({ dueDate: -1 });
+    const coursework = await CourseworkCache.find(filter).sort({ dueDate: -1 }).lean();
     
-    let students = await Student.find({ kelas, isActive: true }).sort({ nis: 1 });
+    let students = await Student.find({ kelas, isActive: true }).sort({ nis: 1 }).lean();
     
     if (kelas) {
       const classroomIds = students.map(s => s.classroomId).filter(Boolean);

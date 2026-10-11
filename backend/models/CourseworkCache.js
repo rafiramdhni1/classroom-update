@@ -70,5 +70,8 @@ courseworkSchema.index({ ownerId: 1, classroomCourseId: 1, classroomWorkId: 1 },
 courseworkSchema.index({ courseAlias: 1 });
 courseworkSchema.index({ dueDate: 1 });
 courseworkSchema.index({ 'studentSubmissions.classroomStudentId': 1 });
+courseworkSchema.index({ 'studentSubmissions.studentId': 1 });
+courseworkSchema.index({ ownerId: 1, courseAlias: 1 });
+courseworkSchema.index({ ownerId: 1, dueDate: -1 });
 
 module.exports = mongoose.model('CourseworkCache', courseworkSchema);
