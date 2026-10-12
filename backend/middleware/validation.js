@@ -44,6 +44,7 @@ const fallbackVerifySchema = z.object({
 const createMessageSchema = z.object({
   title: z.string().min(1, 'Judul pesan harus diisi').max(100),
   content: z.string().min(1, 'Isi pesan harus diisi').max(1000),
+  targetType: z.enum(['all', 'kelas', 'student']).optional(),
   targetStudents: z.array(z.string()).optional(),
   targetKelas: z.array(z.string()).optional(),
   targetAngkatan: z.array(z.number()).optional(),

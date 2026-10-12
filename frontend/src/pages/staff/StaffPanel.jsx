@@ -25,7 +25,7 @@ const MENUS = {
   classroom: { label: 'Nilai Classroom', icon: 'classroom', comp: ClassroomMenu },
   assignments: { label: 'Buat Tugas', icon: 'assignments', comp: AssignmentsMenu },
   calendar: { label: 'Kalender Tugas', icon: 'calendar', comp: CalendarMenu, adminOnly: true },
-  messages: { label: 'Pesan', icon: 'messages', comp: MessagesMenu, adminOnly: true },
+  messages: { label: 'Pesan', icon: 'messages', comp: MessagesMenu },
   codes: { label: 'Kode Aktivasi', icon: 'codes', comp: CodesMenu, adminOnly: true },
   teachers: { label: 'Akun Guru', icon: 'teachers', comp: TeachersMenu, adminOnly: true },
   google: { label: 'Google Classroom', icon: 'google', comp: GoogleMenu },

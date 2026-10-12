@@ -19,7 +19,7 @@ export function StaffProvider({ children }) {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [messageForm, setMessageForm] = useState({
-    title: '', content: '', targetKelas: [], targetAngkatan: [], isGlobal: true, priority: 'normal'
+    title: '', content: '', targetType: 'all', targetKelas: [], targetStudents: [], targetAngkatan: [], isGlobal: true, priority: 'normal'
   });
   const [messageSuccess, setMessageSuccess] = useState('');
   const [generatingCode, setGeneratingCode] = useState(null);
@@ -97,11 +97,21 @@ export function StaffProvider({ children }) {
     }
   };
 
+  const loadMessages = async () => {
+    try {
+      const { data } = await api.get('/admin/messages');
+      setMessages(data.messages || []);
+    } catch (err) {
+      console.warn('Gagal memuat pesan:', err);
+    }
+  };
+
   useEffect(() => {
     if (tab === 'backup') loadBackups();
     if (tab === 'monitoring') loadMonitoring();
     if (tab === 'classroom') loadClassroomSubjects();
     if (tab === 'teachers') loadTeachers();
+    if (tab === 'messages') loadMessages();
     if (tab === 'students') {
       loadStudents();
       loadUnlinkedRoster();
@@ -127,13 +137,16 @@ export function StaffProvider({ children }) {
       const statsRes = await api.get('/admin/dashboard-stats');
       setStats(statsRes.data);
 
+      try {
+        const msgsRes = await api.get('/admin/messages');
+        setMessages(msgsRes.data.messages || []);
+      } catch (_) {}
+
       if (isAdmin) {
-        const [codesRes, msgsRes] = await Promise.all([
-          api.get('/admin/activation-codes'),
-          api.get('/admin/messages'),
-        ]);
-        setCodes(codesRes.data.codes);
-        setMessages(msgsRes.data.messages);
+        try {
+          const codesRes = await api.get('/admin/activation-codes');
+          setCodes(codesRes.data.codes || []);
+        } catch (_) {}
       }
     } catch (err) {
       console.error('Gagal memuat data:', err);
@@ -160,15 +173,27 @@ export function StaffProvider({ children }) {
   };
 
   const handleSendMessage = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     try {
       await api.post('/admin/messages', messageForm);
       setMessageSuccess('Pesan berhasil dikirim!');
-      setMessageForm({ title: '', content: '', targetKelas: [], targetAngkatan: [], isGlobal: true, priority: 'normal' });
-      loadData();
+      setMessageForm({
+        title: '',
+        content: '',
+        targetType: 'all',
+        targetKelas: [],
+        targetStudents: [],
+        targetAngkatan: [],
+        isGlobal: true,
+        priority: 'normal',
+      });
+      loadMessages();
       setTimeout(() => setMessageSuccess(''), 3000);
+      return true;
     } catch (err) {
       console.error('Gagal mengirim pesan:', err);
+      alert('Gagal mengirim pesan: ' + (err.response?.data?.error || err.message));
+      return false;
     }
   };
 
@@ -253,9 +278,10 @@ export function StaffProvider({ children }) {
     if (!confirm('Hapus pesan ini?')) return;
     try {
       await api.delete(`/admin/messages/${id}`);
-      loadData();
+      loadMessages();
     } catch (err) {
       console.error('Gagal hapus:', err);
+      alert('Gagal menghapus pesan: ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -610,7 +636,7 @@ export function StaffProvider({ children }) {
   };
 
   const value = {
-    KELAS_LIST, addAssignment, assignmentTypes, backups, bulkGenerateCodes, bulkResult, bulkText, classroomCourseworks, classroomData, classroomKelas, classroomLastSync, classroomLoading, classroomRealtime, classroomSubject, classroomSubjects, codes, connectGoogle, createBackupNow, createTeacher, creatingBackup, deleteBackupNow, deleteMessage, deleteStudent, deleteTeacher, disconnectGoogle, editForm, editStudent, editingStudent, exportCodesToCSV, exportedCodes, fetchPendingCodes, filterKelas, filteredStudents, generateCode, generatingCode, googleAuth, googleEmail, gradeAssignments, gradeData, gradeKelas, gradeLoading, gradeSaving, gradeSubject, handleBulkImport, handleSearch, handleSendMessage, isAdmin, loadBackups, loadClassroomGrades, loadClassroomSubjects, loadData, loadGrades, loadMonitoring, loadStudents, loadTeachers, loading, logout, messageForm, messageSuccess, messages, monitoring, monitoringLoading, newAssignment, page, restoreBackupNow, saveGrades, saveStudent, search, searchInput, searchTimeout, setAssignmentTypes, setBackups, setBulkResult, setBulkText, setClassroomCourseworks, setClassroomData, setClassroomKelas, setClassroomLastSync, setClassroomLoading, setClassroomRealtime, setClassroomSubject, setClassroomSubjects, setCodes, setCreatingBackup, setEditForm, setEditingStudent, setExportedCodes, setFilterKelas, setGeneratingCode, setGoogleAuth, setGoogleEmail, setGradeAssignments, setGradeData, setGradeKelas, setGradeLoading, setGradeSaving, setGradeSubject, setLoading, setMessageForm, setMessageSuccess, setMessages, setMonitoring, setMonitoringLoading, setNewAssignment, setPage, setSearch, setSearchInput, setShowBulkImport, setShowNewAssignment, setStats, setStudents, setSyncResult, setSyncStudentsResult, setSyncing, setSyncingStudents, setTab, setTeacherForm, setTeacherMsg, setTeachers, setTeachersLoading, setTotalPages, showBulkImport, showNewAssignment, stats, students, syncClassroom, syncResult, syncStudents, syncStudentsResult, syncing, syncingStudents, tab, teacherForm, teacherMsg, teachers, teachersLoading, totalPages, updateScore, user,
+    KELAS_LIST, addAssignment, assignmentTypes, backups, bulkGenerateCodes, bulkResult, bulkText, classroomCourseworks, classroomData, classroomKelas, classroomLastSync, classroomLoading, classroomRealtime, classroomSubject, classroomSubjects, codes, connectGoogle, createBackupNow, createTeacher, creatingBackup, deleteBackupNow, deleteMessage, deleteStudent, deleteTeacher, disconnectGoogle, editForm, editStudent, editingStudent, exportCodesToCSV, exportedCodes, fetchPendingCodes, filterKelas, filteredStudents, generateCode, generatingCode, googleAuth, googleEmail, gradeAssignments, gradeData, gradeKelas, gradeLoading, gradeSaving, gradeSubject, handleBulkImport, handleSearch, handleSendMessage, isAdmin, loadBackups, loadClassroomGrades, loadClassroomSubjects, loadData, loadGrades, loadMessages, loadMonitoring, loadStudents, loadTeachers, loading, logout, messageForm, messageSuccess, messages, monitoring, monitoringLoading, newAssignment, page, restoreBackupNow, saveGrades, saveStudent, search, searchInput, searchTimeout, setAssignmentTypes, setBackups, setBulkResult, setBulkText, setClassroomCourseworks, setClassroomData, setClassroomKelas, setClassroomLastSync, setClassroomLoading, setClassroomRealtime, setClassroomSubject, setClassroomSubjects, setCodes, setCreatingBackup, setEditForm, setEditingStudent, setExportedCodes, setFilterKelas, setGeneratingCode, setGoogleAuth, setGoogleEmail, setGradeAssignments, setGradeData, setGradeKelas, setGradeLoading, setGradeSaving, setGradeSubject, setLoading, setMessageForm, setMessageSuccess, setMessages, setMonitoring, setMonitoringLoading, setNewAssignment, setPage, setSearch, setSearchInput, setShowBulkImport, setShowNewAssignment, setStats, setStudents, setSyncResult, setSyncStudentsResult, setSyncing, setSyncingStudents, setTab, setTeacherForm, setTeacherMsg, setTeachers, setTeachersLoading, setTotalPages, showBulkImport, showNewAssignment, stats, students, syncClassroom, syncResult, syncStudents, syncStudentsResult, syncing, syncingStudents, tab, teacherForm, teacherMsg, teachers, teachersLoading, totalPages, updateScore, user,
     classroomStatus, setClassroomStatus, classroomStats, setClassroomStats, unlinkedRoster, unlinkedRosterLoading, loadUnlinkedRoster,
   };
 

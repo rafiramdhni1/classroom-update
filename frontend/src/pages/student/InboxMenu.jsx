@@ -72,13 +72,19 @@ export default function InboxMenu() {
                       <p className="min-w-0 text-sm font-bold text-ink">{msg.title}</p>
                       {!read && <span className="badge-accent">Baru</span>}
                       <span className={`badge ${p.cls}`}>{p.label}</span>
+                      {msg.targetStudents && msg.targetStudents.length > 0 && (
+                        <span className="badge bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">Pesan Pribadi</span>
+                      )}
                     </div>
                     {isOpen && (
                       <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-muted">{msg.content}</p>
                     )}
-                    <p className="mt-1.5 text-[11px] text-muted/80">
-                      {new Date(msg.createdAt).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })}
-                    </p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-muted/80">
+                      <span>{new Date(msg.createdAt).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })}</span>
+                      {msg.senderName && (
+                        <span>• Dari: <strong className="text-ink">{msg.senderName}</strong></span>
+                      )}
+                    </div>
                   </div>
                   <Icon name="chevronDown" className={`mt-1 h-4 w-4 shrink-0 text-muted transition ${isOpen ? 'rotate-180' : ''}`} />
                 </button>

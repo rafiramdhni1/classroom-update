@@ -243,35 +243,80 @@ router.delete('/students/:id', staffOnly, async (req, res) => {
   }
 });
 
-// POST /api/admin/messages
-router.post('/messages', adminOnly, validate(createMessageSchema), async (req, res) => {
+// GET /api/admin/students-selector (quick list for message picker)
+router.get('/students-selector', staffOnly, async (req, res) => {
   try {
-    const { title, content, targetStudents, targetKelas, targetAngkatan, isGlobal, priority, expiresAt } = req.body;
-
-    const message = new AdminMessage({
-      title,
-      content,
-      targetStudents: targetStudents || [],
-      targetKelas: targetKelas || [],
-      targetAngkatan: targetAngkatan || [],
-      isGlobal: isGlobal || false,
-      priority: priority || 'normal',
-      expiresAt: expiresAt ? new Date(expiresAt) : undefined,
-    });
-
-    await message.save();
-    res.status(201).json({ message: 'Pesan berhasil dikirim.', data: message });
+    const { kelas } = req.query;
+    const filter = { isActive: true };
+    if (kelas) filter.kelas = kelas;
+    const students = await Student.find(filter)
+      .select('_id nama nis kelas')
+      .sort({ kelas: 1, nama: 1 })
+      .lean();
+    res.json({ students });
   } catch (error) {
     res.status(500).json({ error: 'Terjadi kesalahan server.' });
   }
 });
 
+// POST /api/admin/messages
+router.post('/messages', staffOnly, validate(createMessageSchema), async (req, res) => {
+  try {
+    const { title, content, targetType = 'all', targetStudents, targetKelas, targetAngkatan, isGlobal, priority, expiresAt } = req.body;
+
+    let finalIsGlobal = false;
+    let finalTargetKelas = [];
+    let finalTargetStudents = [];
+
+    if (targetType === 'all' || isGlobal === true) {
+      finalIsGlobal = true;
+    } else if (targetType === 'kelas') {
+      finalTargetKelas = Array.isArray(targetKelas) ? targetKelas : (targetKelas ? [targetKelas] : []);
+    } else if (targetType === 'student') {
+      finalTargetStudents = Array.isArray(targetStudents) ? targetStudents : (targetStudents ? [targetStudents] : []);
+    } else {
+      // Fallback manual
+      finalIsGlobal = !!isGlobal;
+      finalTargetKelas = targetKelas || [];
+      finalTargetStudents = targetStudents || [];
+    }
+
+    const senderDisplayName = req.user.namaLengkap || req.user.nama || (req.user.role === 'admin' ? 'Administrator' : `Guru (${req.user.nisn})`);
+
+    const message = new AdminMessage({
+      title,
+      content,
+      targetType,
+      targetStudents: finalTargetStudents,
+      targetKelas: finalTargetKelas,
+      targetAngkatan: targetAngkatan || [],
+      isGlobal: finalIsGlobal,
+      priority: priority || 'normal',
+      sender: req.user._id,
+      senderName: senderDisplayName,
+      senderRole: req.user.role || 'staff',
+      expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+    });
+
+    await message.save();
+    const populated = await AdminMessage.findById(message._id)
+      .populate('targetStudents', 'nama nis kelas')
+      .lean();
+
+    res.status(201).json({ message: 'Pesan berhasil dikirim.', data: populated });
+  } catch (error) {
+    res.status(500).json({ error: 'Terjadi kesalahan server: ' + error.message });
+  }
+});
+
 // GET /api/admin/messages
-router.get('/messages', adminOnly, async (req, res) => {
+router.get('/messages', staffOnly, async (req, res) => {
   try {
     const messages = await AdminMessage.find()
+      .populate('targetStudents', 'nama nis kelas')
       .sort({ createdAt: -1 })
-      .limit(50);
+      .limit(100)
+      .lean();
     res.json({ messages });
   } catch (error) {
     res.status(500).json({ error: 'Terjadi kesalahan server.' });
@@ -279,8 +324,16 @@ router.get('/messages', adminOnly, async (req, res) => {
 });
 
 // DELETE /api/admin/messages/:id
-router.delete('/messages/:id', adminOnly, async (req, res) => {
+router.delete('/messages/:id', staffOnly, async (req, res) => {
   try {
+    const msg = await AdminMessage.findById(req.params.id);
+    if (!msg) return res.status(404).json({ error: 'Pesan tidak ditemukan.' });
+
+    // Admin can delete any message; Guru can only delete their own
+    if (req.user.role !== 'admin' && String(msg.sender) !== String(req.user._id)) {
+      return res.status(403).json({ error: 'Akses ditolak. Anda hanya dapat menghapus pesan yang Anda buat sendiri.' });
+    }
+
     await AdminMessage.findByIdAndDelete(req.params.id);
     res.json({ message: 'Pesan dihapus.' });
   } catch (error) {

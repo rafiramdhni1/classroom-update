@@ -20,11 +20,22 @@ const adminMessageSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  targetType: {
+    type: String,
+    enum: ['all', 'kelas', 'student'],
+    default: 'all',
+  },
   priority: {
     type: String,
     enum: ['low', 'normal', 'high', 'urgent'],
     default: 'normal',
   },
+  sender: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  senderName: String,
+  senderRole: String,
   isReadBy: [{
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
