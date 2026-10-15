@@ -71,6 +71,13 @@ const bulkCreateSchema = z.object({
   defaultPassword: z.string().min(6).optional(),
 });
 
+const updateAdminProfileSchema = z.object({
+  username: z.string().trim().optional(),
+  name: z.string().trim().max(100, 'Nama maksimal 100 karakter').optional(),
+  currentPassword: z.string().min(1, 'Password saat ini harus diisi untuk konfirmasi keamanan'),
+  newPassword: z.string().optional(),
+});
+
 function validate(schema) {
   return (req, res, next) => {
     try {
@@ -107,5 +114,6 @@ module.exports = {
   createMessageSchema,
   createActivationCodeSchema,
   bulkCreateSchema,
+  updateAdminProfileSchema,
   validate,
 };

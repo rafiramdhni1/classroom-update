@@ -17,6 +17,7 @@ import TeachersMenu from './teachersMenu';
 import GoogleMenu from './googleMenu';
 import BackupMenu from './backupMenu';
 import MonitoringMenu from './monitoringMenu';
+import AccountMenu from './accountMenu';
 
 const MENUS = {
   overview: { label: 'Ringkasan', icon: 'overview', comp: OverviewMenu },
@@ -32,13 +33,14 @@ const MENUS = {
   import: { label: 'Import Data', icon: 'import', comp: ImportMenu, adminOnly: true },
   backup: { label: 'Backup', icon: 'backup', comp: BackupMenu, adminOnly: true },
   monitoring: { label: 'Monitoring', icon: 'monitoring', comp: MonitoringMenu, adminOnly: true },
+  account: { label: 'Pengaturan Akun', icon: 'settings', comp: AccountMenu },
 };
 
 const SECTIONS = [
   { label: 'Akademik', keys: ['overview', 'students', 'grades', 'classroom', 'assignments'] },
   { label: 'Kalender', keys: ['calendar'] },
   { label: 'Komunikasi', keys: ['messages', 'codes'] },
-  { label: 'Sistem', keys: ['teachers', 'google', 'import', 'backup', 'monitoring'] },
+  { label: 'Sistem', keys: ['teachers', 'google', 'import', 'backup', 'monitoring', 'account'] },
 ];
 
 function Shell() {
@@ -85,8 +87,9 @@ function Shell() {
       sections={sections}
       active={activeKey}
       onChange={setTab}
-      user={{ ...user, name: user?.nisn }}
+      user={{ ...user, name: user?.name || user?.nisn }}
       logout={logout}
+      onUserClick={() => setTab('account')}
     >
       <Current />
     </AppShell>

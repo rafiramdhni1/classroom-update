@@ -11,6 +11,7 @@ const {
   createMessageSchema,
   createActivationCodeSchema,
   bulkCreateSchema,
+  updateAdminProfileSchema,
 } = require('../middleware/validation');
 
 const { google } = require('googleapis');
@@ -703,6 +704,156 @@ router.delete('/teachers/:userId', adminOnly, async (req, res) => {
   } catch (error) {
     console.error('Delete teacher error:', error);
     res.status(500).json({ error: 'Terjadi kesalahan server.' });
+  }
+});
+
+// GET /api/admin/profile - Ambil data profil admin/guru yang sedang login
+router.get('/profile', staffOnly, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User tidak ditemukan.' });
+    }
+
+    let student = null;
+    if (user.studentId) {
+      student = await Student.findById(user.studentId);
+    }
+
+    res.json({
+      user: {
+        id: user._id,
+        nis: user.nis,
+        nisn: user.nisn,
+        name: student?.nama || user.nisn,
+        role: user.role,
+        googleEmail: user.googleEmail || null,
+        hasGoogleAuth: !!user.googleAccessToken,
+        lastLogin: user.lastLogin,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error('Get admin profile error:', error);
+    res.status(500).json({ error: 'Terjadi kesalahan server.' });
+  }
+});
+
+// PUT /api/admin/profile - Edit login username dan password untuk admin/staff itu sendiri
+router.put('/profile', staffOnly, validate(updateAdminProfileSchema), async (req, res) => {
+  try {
+    const { username, name, currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User tidak ditemukan.' });
+    }
+
+    // Verifikasi password saat ini
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Password saat ini salah.' });
+    }
+
+    let usernameChanged = false;
+    const cleanUsername = username ? String(username).trim() : '';
+
+    if (cleanUsername) {
+      if (cleanUsername.length < 3) {
+        return res.status(400).json({ error: 'Username minimal 3 karakter.' });
+      }
+      if (cleanUsername.length > 50) {
+        return res.status(400).json({ error: 'Username maksimal 50 karakter.' });
+      }
+      if (!/^[a-zA-Z0-9_.-]+$/.test(cleanUsername)) {
+        return res.status(400).json({ error: 'Username hanya boleh berisi huruf, angka, titik, strip, atau underscore.' });
+      }
+
+      if (cleanUsername !== user.nisn || cleanUsername !== user.nis) {
+        // Cek duplikat di User
+        const dupUser = await User.findOne({
+          _id: { $ne: user._id },
+          $or: [{ nisn: cleanUsername }, { nis: cleanUsername }],
+        });
+        if (dupUser) {
+          return res.status(400).json({ error: 'Username sudah digunakan oleh akun lain.' });
+        }
+
+        // Cek duplikat di Student jika ada studentId
+        if (user.studentId) {
+          const dupStudent = await Student.findOne({
+            _id: { $ne: user.studentId },
+            $or: [{ nisn: cleanUsername }, { nis: cleanUsername }],
+          });
+          if (dupStudent) {
+            return res.status(400).json({ error: 'Username sudah terdaftar pada data siswa.' });
+          }
+        }
+
+        user.nisn = cleanUsername;
+        user.nis = cleanUsername;
+        usernameChanged = true;
+      }
+    }
+
+    // Validasi & update password baru jika diisi
+    let passwordChanged = false;
+    if (newPassword && String(newPassword).trim()) {
+      const cleanPassword = String(newPassword).trim();
+      if (cleanPassword.length < 6) {
+        return res.status(400).json({ error: 'Password baru minimal 6 karakter.' });
+      }
+      user.password = cleanPassword;
+      user.mustChangePassword = false;
+      passwordChanged = true;
+    }
+
+    // Update nama siswa jika ada studentId
+    let nameChanged = false;
+    const cleanName = name ? String(name).trim() : '';
+    let updatedDisplayName = user.nisn;
+
+    if (user.studentId) {
+      const student = await Student.findById(user.studentId);
+      if (student) {
+        if (usernameChanged) {
+          student.nis = cleanUsername;
+          student.nisn = cleanUsername;
+        }
+        if (cleanName && cleanName !== student.nama) {
+          student.nama = cleanName;
+          nameChanged = true;
+        }
+        await student.save();
+        updatedDisplayName = student.nama;
+      }
+    } else if (cleanName) {
+      updatedDisplayName = cleanName;
+    }
+
+    if (!usernameChanged && !passwordChanged && !nameChanged) {
+      return res.status(400).json({ error: 'Tidak ada perubahan data yang disimpan.' });
+    }
+
+    await user.save();
+
+    res.json({
+      message: 'Kredensial akun berhasil diperbarui.',
+      user: {
+        id: user._id,
+        nis: user.nis,
+        nisn: user.nisn,
+        name: updatedDisplayName,
+        role: user.role,
+      },
+      updatedFields: {
+        username: usernameChanged,
+        password: passwordChanged,
+        name: nameChanged,
+      },
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: 'Terjadi kesalahan server saat memperbarui akun: ' + error.message });
   }
 });
 

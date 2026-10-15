@@ -5,7 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 
 const ROLE_LABEL = { admin: 'Administrator', guru: 'Guru', student: 'Siswa', parent: 'Orang Tua' };
 
-export default function AppShell({ sections = [], active, onChange, title, subtitle, user, logout, actions, children }) {
+export default function AppShell({ sections = [], active, onChange, title, subtitle, user, logout, actions, onUserClick, children }) {
   const [open, setOpen] = useState(false);
   const { isDark, toggle } = useTheme();
 
@@ -70,21 +70,52 @@ export default function AppShell({ sections = [], active, onChange, title, subti
 
   const UserCard = (
     <div className="relative p-3">
-      <div className="flex items-center gap-3 rounded-2xl bg-white/12 p-2.5 ring-1 ring-white/15 backdrop-blur">
-        <span className="relative">
-          <Avatar name={user?.name || user?.nisn || 'U'} className="avatar-on-brand h-9 w-9 text-[11px] ring-white/40" />
-          <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[rgb(var(--shell-2))] bg-success" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-bold text-white">{user?.name || user?.nisn || '-'}</p>
-          <p className="truncate text-[10px] text-white/60">
-            {ROLE_LABEL[user?.role] || user?.role}
-          </p>
-        </div>
+      <div className="flex items-center gap-2 rounded-2xl bg-white/12 p-2.5 ring-1 ring-white/15 backdrop-blur">
+        {onUserClick ? (
+          <button
+            type="button"
+            onClick={onUserClick}
+            className="flex min-w-0 flex-1 items-center gap-2.5 text-left transition hover:opacity-85 focus:outline-none"
+            title="Buka Pengaturan Akun"
+          >
+            <span className="relative shrink-0">
+              <Avatar name={user?.name || user?.nisn || 'U'} className="avatar-on-brand h-9 w-9 text-[11px] ring-white/40" />
+              <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[rgb(var(--shell-2))] bg-success" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-bold text-white">{user?.name || user?.nisn || '-'}</p>
+              <p className="truncate text-[10px] text-white/60">
+                {ROLE_LABEL[user?.role] || user?.role}
+              </p>
+            </div>
+          </button>
+        ) : (
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            <span className="relative shrink-0">
+              <Avatar name={user?.name || user?.nisn || 'U'} className="avatar-on-brand h-9 w-9 text-[11px] ring-white/40" />
+              <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[rgb(var(--shell-2))] bg-success" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-bold text-white">{user?.name || user?.nisn || '-'}</p>
+              <p className="truncate text-[10px] text-white/60">
+                {ROLE_LABEL[user?.role] || user?.role}
+              </p>
+            </div>
+          </div>
+        )}
+        {onUserClick && (
+          <button
+            onClick={onUserClick}
+            title="Pengaturan Akun"
+            className="grid h-8 w-8 place-items-center rounded-lg text-white/80 transition hover:bg-white/20 hover:text-white shrink-0"
+          >
+            <Icon name="settings" className="h-4 w-4" />
+          </button>
+        )}
         <button
           onClick={logout}
           title="Keluar"
-          className="grid h-8 w-8 place-items-center rounded-lg text-white/80 transition hover:bg-white/20 hover:text-white"
+          className="grid h-8 w-8 place-items-center rounded-lg text-white/80 transition hover:bg-white/20 hover:text-white shrink-0"
         >
           <Icon name="logout" className="h-4 w-4" />
         </button>
@@ -161,9 +192,20 @@ export default function AppShell({ sections = [], active, onChange, title, subti
               >
                 <Icon name={isDark ? 'sun' : 'moon'} className="h-[18px] w-[18px]" />
               </button>
-              <span className="hidden ring-2 ring-accent/40 sm:block rounded-full">
-                <Avatar name={user?.name || user?.nisn || 'U'} className="h-9 w-9 text-[11px]" />
-              </span>
+              {onUserClick ? (
+                <button
+                  type="button"
+                  onClick={onUserClick}
+                  title="Pengaturan Akun"
+                  className="hidden ring-2 ring-accent/40 sm:block rounded-full hover:ring-accent transition cursor-pointer"
+                >
+                  <Avatar name={user?.name || user?.nisn || 'U'} className="h-9 w-9 text-[11px]" />
+                </button>
+              ) : (
+                <span className="hidden ring-2 ring-accent/40 sm:block rounded-full">
+                  <Avatar name={user?.name || user?.nisn || 'U'} className="h-9 w-9 text-[11px]" />
+                </span>
+              )}
             </div>
           </div>
         </header>

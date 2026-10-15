@@ -43,8 +43,23 @@ export function AuthProvider({ children }) {
     setStudent(null);
   };
 
+  const updateUser = (updatedFields) => {
+    setUser(prev => {
+      const nextUser = { ...prev, ...updatedFields };
+      try {
+        const savedUser = localStorage.getItem('user');
+        if (savedUser) {
+          const parsed = JSON.parse(savedUser);
+          parsed.user = { ...parsed.user, ...updatedFields };
+          localStorage.setItem('user', JSON.stringify(parsed));
+        }
+      } catch {}
+      return nextUser;
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, student, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, student, login, logout, updateUser, setUser, loading }}>
       {children}
     </AuthContext.Provider>
   );
